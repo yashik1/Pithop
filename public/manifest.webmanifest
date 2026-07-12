@@ -1,0 +1,13 @@
+{
+  "name": "SideQuest — fun stops on long drives",
+  "short_name": "SideQuest",
+  "description": "Find fun stops, hidden gems and breaks along your driving route.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#2563eb",
+  "icons": [
+    { "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
+    { "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "maskable" }
+  ]
+}
