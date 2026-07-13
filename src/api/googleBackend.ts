@@ -53,6 +53,24 @@ function categorizeGoogle(primaryType: string | undefined): { category: Category
     for (const rule of TYPE_TO_CATEGORY) {
       if (rule.types.includes(primaryType)) return { category: rule.category, kind: rule.kind };
     }
+    // Keyword fallbacks for the long tail of Google place types
+    // (e.g. american_restaurant, city_park, scenic_spot, convenience_store).
+    if (/gas|fuel|charging|rest_stop|truck|convenience/.test(primaryType)) {
+      return { category: 'rest', kind: 'fuel' };
+    }
+    if (/restaurant|food|diner|dessert|ice_cream|sandwich|pizza|steak|barbecue|buffet/.test(primaryType)) {
+      return { category: 'food', kind: 'restaurant' };
+    }
+    if (/scenic|viewpoint|observation/.test(primaryType)) return { category: 'views', kind: 'viewpoint' };
+    if (/(^|_)parks?($|_)|garden|natural|beach|campground|wildlife/.test(primaryType)) {
+      return { category: 'nature', kind: 'park' };
+    }
+    if (/museum|gallery|theater|theatre|cultural/.test(primaryType)) {
+      return { category: 'museums', kind: 'museum' };
+    }
+    if (/historical|monument|landmark|church|temple|mosque|shrine|bridge|castle/.test(primaryType)) {
+      return { category: 'history', kind: 'historic_site' };
+    }
   }
   return { category: 'fun', kind: 'attraction' };
 }
