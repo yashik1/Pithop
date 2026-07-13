@@ -8,13 +8,10 @@ export interface Stop {
   category: CategoryId;
   kind: string;
   visitMin: number;
-  source: 'wiki' | 'osm' | 'google';
+  source: 'wiki' | 'osm' | 'geoapify';
   description?: string;
   imageUrl?: string;
   wikiUrl?: string;
-  rating?: number;
-  ratingCount?: number;
-  gmapsUri?: string;
   offRouteKm: number;
   alongKm: number;
   detourMin: number;

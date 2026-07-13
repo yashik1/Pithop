@@ -7,6 +7,8 @@ export interface RouteResult {
 }
 
 export async function fetchRoute(from: LatLng, to: LatLng): Promise<RouteResult> {
+  const { hasGeoapify, geoapifyRoute } = await import('./geoapify');
+  if (hasGeoapify()) return geoapifyRoute(from, to);
   const url =
     `https://router.project-osrm.org/route/v1/driving/` +
     `${from.lng},${from.lat};${to.lng},${to.lat}?overview=full&geometries=geojson`;

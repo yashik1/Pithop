@@ -5,7 +5,7 @@
 // are never cached here — the app persists the trip itself in localStorage.
 const CACHE = 'sidequest-v4';
 const EXT_CACHE = 'sidequest-ext-v1';
-const EXT_HOSTS = ['tile.openstreetmap.org', 'upload.wikimedia.org'];
+const EXT_HOSTS = ['tile.openstreetmap.org', 'maps.geoapify.com', 'upload.wikimedia.org'];
 const EXT_MAX_ENTRIES = 600;
 
 self.addEventListener('install', () => {

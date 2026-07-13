@@ -5,7 +5,7 @@ export interface GeocodeResult {
 }
 
 export async function geocode(query: string): Promise<GeocodeResult> {
-  // "lat, lng" input (e.g. from the use-my-location button) skips Nominatim.
+  // "lat, lng" input (e.g. from the use-my-location button) skips geocoding.
   const coords = query.match(/^\s*(-?\d{1,2}(?:\.\d+)?)\s*,\s*(-?\d{1,3}(?:\.\d+)?)\s*$/);
   if (coords) {
     const lat = parseFloat(coords[1]);
@@ -14,6 +14,8 @@ export async function geocode(query: string): Promise<GeocodeResult> {
       return { lat, lng, displayName: `My location (${lat.toFixed(3)}, ${lng.toFixed(3)})` };
     }
   }
+  const { hasGeoapify, geoapifyGeocode } = await import('./geoapify');
+  if (hasGeoapify()) return geoapifyGeocode(query);
   const url = `https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(query)}`;
   const res = await fetch(url, { headers: { Accept: 'application/json' } });
   if (!res.ok) throw new Error(`Geocoding failed (HTTP ${res.status})`);

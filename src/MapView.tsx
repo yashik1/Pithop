@@ -4,6 +4,7 @@ import type { RouteResult } from './api/route';
 import type { Stop } from './types';
 import { CATEGORY_MAP, thingsToDo } from './lib/categories';
 import { fmtDur } from './lib/format';
+import { geoapifyTileLayer, hasGeoapify } from './api/geoapify';
 
 interface Props {
   route: RouteResult | null;
@@ -24,20 +25,17 @@ function buildPopup(stop: Stop, live: { current: LiveProps }): HTMLElement {
   const cat = CATEGORY_MAP[stop.category];
   const div = document.createElement('div');
   div.className = 'map-popup';
-  const gmaps = stop.gmapsUri ?? `https://www.google.com/maps/search/?api=1&query=${stop.lat}%2C${stop.lng}`;
+  // A plain Google Maps deep link for turn-by-turn navigation — no API involved.
+  const gmaps = `https://www.google.com/maps/search/?api=1&query=${stop.lat}%2C${stop.lng}`;
   const img = stop.imageUrl ? `<img class="p-img" src="${stop.imageUrl}" alt="" />` : '';
   const wiki = stop.wikiUrl
     ? ` · <a class="p-link" href="${stop.wikiUrl}" target="_blank" rel="noreferrer">Wikipedia ↗</a>`
-    : '';
-  const rating = stop.rating
-    ? `<div class="p-meta">★ ${stop.rating.toFixed(1)}${stop.ratingCount ? ` (${stop.ratingCount.toLocaleString()} reviews)` : ''}</div>`
     : '';
   div.innerHTML = `
     ${img}
     <div class="p-name"></div>
     <div class="p-desc"></div>
     <div class="p-meta">${cat.emoji} ${cat.label}</div>
-    ${rating}
     <div class="p-meta">⏱ ~${fmtDur(stop.visitMin)} visit · 🚗 ~${stop.detourMin} min off route</div>
     <div class="p-todo"></div>
     <div class="p-links"><a class="p-link" href="${gmaps}" target="_blank" rel="noreferrer">Open in Google Maps ↗</a>${wiki}</div>
@@ -68,10 +66,15 @@ export function MapView({ route, stops, planIds, selectedId, onSelect, onToggleP
 
   useEffect(() => {
     const map = L.map(divRef.current!, { preferCanvas: true }).setView([39.5, -98.35], 4);
-    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-      maxZoom: 19,
-    }).addTo(map);
+    // Geoapify tiles (commercial-use OK, needs attribution) when a key is
+    // configured; the donation-funded OSM public tiles otherwise.
+    const tiles = hasGeoapify()
+      ? geoapifyTileLayer()
+      : {
+          url: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+          attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+        };
+    L.tileLayer(tiles.url, { attribution: tiles.attribution, maxZoom: 19 }).addTo(map);
     routeLayerRef.current = L.layerGroup().addTo(map);
     stopsLayerRef.current = L.layerGroup().addTo(map);
     mapRef.current = map;

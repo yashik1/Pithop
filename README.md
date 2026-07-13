@@ -10,9 +10,8 @@ added time for your trip.
 Tap any stop to expand it: you get a photo, a short intro pulled from the
 Wikipedia article, and a **"what you can do here"** hint (e.g. parks → walk a
 trail or picnic; viewpoints → quick photo stop) plus Wikipedia / Google Maps
-links. Roadside stops from OpenStreetMap show extra detail from their map
-tags — cuisine and opening hours for food, restrooms/picnic tables for rest
-areas — and Google-sourced places include Google's editorial summary.
+links. Roadside stops show extra detail from their OpenStreetMap tags —
+cuisine and opening hours for food, restrooms/picnic tables for rest areas.
 
 ## Run it
 
@@ -25,15 +24,23 @@ No API keys required.
 
 ## How it works
 
-| Concern | Service | Notes |
+The app runs in one of two modes, switched by a single env var:
+
+- **Hobby mode (no key):** free public OSM services. Fine for personal use;
+  their usage policies disallow or discourage commercial apps.
+- **Commercial mode (`VITE_GEOAPIFY_API_KEY` set):** [Geoapify](https://www.geoapify.com/)
+  replaces every public server. Open-data based, commercial use allowed with
+  attribution, generous free tier (~3,000 credits/day).
+
+| Concern | Hobby mode (no key) | With Geoapify key |
 | --- | --- | --- |
-| Autocomplete | [Photon](https://photon.komoot.io/) (OSM) | Free search-as-you-type; chosen suggestions carry exact coordinates |
-| Geocoding fallback | [Nominatim](https://nominatim.org/) | For free-typed text, ~1 req/s fair-use limit |
-| Driving route | [OSRM demo server](https://project-osrm.org/) | Free demo instance, no SLA |
-| Landmarks & attractions | Wikipedia GeoSearch API | Fast, includes descriptions + photos |
-| Food, viewpoints, rest stops | [Overpass API](https://overpass-api.de/) (OpenStreetMap) | Often busy — treated as best-effort |
-| Map tiles | OpenStreetMap tiles + Leaflet | Free fair-use |
-| Per-stop navigation | Google Maps deep links | No key needed |
+| Autocomplete | [Photon](https://photon.komoot.io/) (OSM) | Geoapify Autocomplete |
+| Geocoding fallback | [Nominatim](https://nominatim.org/) (~1 req/s) | Geoapify Geocoding |
+| Driving route | [OSRM demo server](https://project-osrm.org/) (no SLA) | Geoapify Routing |
+| Landmarks & attractions | Wikipedia GeoSearch API | Wikipedia (always — CC BY-SA, attributed) |
+| Food, viewpoints, rest stops | [Overpass API](https://overpass-api.de/) (often busy) | Geoapify Places |
+| Map tiles | OpenStreetMap tiles + Leaflet | Geoapify tiles + Leaflet |
+| Per-stop navigation | Google Maps deep links (plain URLs, no API — allowed) | same |
 
 Pipeline: geocode both endpoints → fetch route geometry from OSRM → sample the
 route into evenly spaced points (~12 km apart, capped at ~80) → query both
@@ -57,8 +64,7 @@ museum ≈ 90 min, theme park ≈ 4 h, …).
 ## Pre-trip and in-car
 
 - **Pre-trip planning:** search a route on desktop, filter, build a stop list,
-  see total added time. With the Google proxy configured you also get a
-  traffic-aware door-to-door total and an optimized stop order.
+  see total added time.
 - **In-car (PWA):** the app is installable (Add to Home Screen). On the road:
   tap 📍 to use your current location as the origin, and enable
   **"only stops ahead of me (next 80 km)"** to filter the list/map to what's
@@ -68,42 +74,35 @@ museum ≈ 90 min, theme park ≈ 4 h, …).
   Lose signal in the middle of nowhere and reopen the app — your trip, plan
   and "stops ahead of me" (GPS needs no internet) all still work.
 
-## Optional Google integration (better data, live traffic)
+## Going commercial: the Geoapify key
 
-Three Vercel serverless functions in `api/` proxy Google APIs so the key never
-reaches the browser. Without a key the app silently stays on the free stack.
+The free public OSM servers ([tile usage policy](https://operations.osmfoundation.org/policies/tiles/),
+[Nominatim policy](https://operations.osmfoundation.org/policies/nominatim/))
+warn commercial apps that access can be cut off at any time, and the earlier
+Google Places/Routes integration was removed because Google's terms prohibit
+displaying its data on a non-Google (Leaflet) map. Geoapify solves both:
+open-data, commercial use allowed, one key for everything.
 
-- `api/places.ts` — Places API (New) *search along route*: adds high-quality,
-  **rated** food/attraction/park stops (3 billable text-search calls per
-  route search).
-- `api/route.ts` — Routes API: traffic-aware total through your chosen stops
-  plus optimized stop order (1 call per plan change, debounced).
-- `api/health.ts` — tells the client whether the key is configured.
-
-### Getting the API key
-
-1. Go to [console.cloud.google.com](https://console.cloud.google.com/) and
-   create a project (any name, e.g. `sidequest`).
-2. Billing must be enabled (Google gives new accounts $300 free credit, plus
-   a recurring monthly free tier for Maps APIs).
-3. In **APIs & Services → Library**, enable **Places API (New)** and
-   **Routes API**.
-4. In **APIs & Services → Credentials**, create an **API key**. Under key
-   restrictions, restrict it to those two APIs (no HTTP-referrer restriction
-   needed — it's only used server-side).
-5. Set it as the `GOOGLE_MAPS_API_KEY` environment variable in Vercel
-   (Project → Settings → Environment Variables) and redeploy.
+1. Create a free account at [geoapify.com](https://www.geoapify.com/) and make
+   a project → API key.
+2. In the Geoapify dashboard, restrict the key to your domain(s) — it ships to
+   the browser, domain restriction is what keeps it yours.
+3. Set it as `VITE_GEOAPIFY_API_KEY` in Vercel (Project → Settings →
+   Environment Variables) and redeploy. No key = hobby mode, automatically.
 
 ## Deploying (Vercel)
 
-The repo is Vercel-ready: Vite front end + `api/` serverless functions.
-
 1. [vercel.com/new](https://vercel.com/new) → Import the GitHub repo
    (`yashik1/Side-quest`). Framework preset: **Vite** (auto-detected). Deploy.
-2. Add the `GOOGLE_MAPS_API_KEY` env var (optional — see above) and redeploy.
+2. Add the `VITE_GEOAPIFY_API_KEY` env var (optional — see above) and redeploy.
+
+## Privacy
+
+No accounts, no trackers, no analytics. Trips are stored in the browser's
+local storage only. See `public/privacy.html` (linked in the app footer) for
+the full policy, data-source attribution and affiliate disclosure.
 
 ## Further production hardening
 
 - Cache corridor queries server-side (Vercel KV / Upstash) to cut API costs.
-- Self-hosted OSRM + Photon/Nominatim to drop the demo-server dependency.
 - Live position tracking (`watchPosition`) and re-routing for in-car mode.

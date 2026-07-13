@@ -63,7 +63,8 @@ async function runQuery(endpoint: string, query: string): Promise<OverpassElemen
 // Turn raw OSM tags into a short human-readable "what's here" line, e.g.
 // "Mexican, barbecue · Outdoor seating · Open Mo-Su 07:00-22:00" for a
 // restaurant or "Restrooms · Picnic tables" for a rest area.
-function describeOsm(tags: Record<string, string>, kind: string): string | undefined {
+// Also used by the Geoapify provider — its results carry the same OSM tags.
+export function describeOsm(tags: Record<string, string>, kind: string): string | undefined {
   const parts: string[] = [];
   if (tags.description) parts.push(tags.description.slice(0, 140));
   if (FOOD_KINDS.includes(kind) && tags.cuisine) {
