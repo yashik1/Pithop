@@ -273,33 +273,37 @@ export default function App() {
   return (
     <div className="app">
       <aside className="sidebar">
-        <header className="brand">
-          <h1>🛣️ SideQuest</h1>
-          <p>Fun stops, hidden gems and breaks along your drive</p>
-        </header>
+        <div className="hero">
+          <header className="brand">
+            <h1>
+              <span className="brand-icon">🛣️</span> <span className="brand-name">SideQuest</span>
+            </h1>
+            <p>Fun stops, hidden gems and breaks along your drive</p>
+          </header>
 
-        <form
-          className="search"
-          onSubmit={(e) => {
-            e.preventDefault();
-            void findStops();
-          }}
-        >
-          <div className="from-row">
-            <input
-              value={fromText}
-              onChange={(e) => setFromText(e.target.value)}
-              placeholder="From — city, address or 📍"
-            />
-            <button type="button" className="geo-btn" title="Use my location" onClick={useMyLocation}>
-              📍
+          <form
+            className="search"
+            onSubmit={(e) => {
+              e.preventDefault();
+              void findStops();
+            }}
+          >
+            <div className="from-row">
+              <input
+                value={fromText}
+                onChange={(e) => setFromText(e.target.value)}
+                placeholder="From — city, address or 📍"
+              />
+              <button type="button" className="geo-btn" title="Use my location" onClick={useMyLocation}>
+                📍
+              </button>
+            </div>
+            <input value={toText} onChange={(e) => setToText(e.target.value)} placeholder="To — city or address" />
+            <button type="submit" className={`go-btn${busy ? ' busy' : ''}`} disabled={!!busy || !fromText.trim() || !toText.trim()}>
+              {busy ?? 'Find stops along the way'}
             </button>
-          </div>
-          <input value={toText} onChange={(e) => setToText(e.target.value)} placeholder="To — city or address" />
-          <button type="submit" disabled={!!busy || !fromText.trim() || !toText.trim()}>
-            {busy ?? 'Find stops along the way'}
-          </button>
-        </form>
+          </form>
+        </div>
 
         {error && <div className="error">⚠️ {error}</div>}
         {notice && !busy && <div className="notice">ℹ️ {notice}</div>}
