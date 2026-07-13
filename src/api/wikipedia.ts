@@ -225,21 +225,9 @@ async function fetchNear(p: LatLng): Promise<WikiPage[]> {
   return Object.values(data.query?.pages ?? {}) as WikiPage[];
 }
 
-export async function fetchWikiStops(samples: LatLng[]): Promise<Stop[]> {
-  const byId = new Map<number, WikiPage>();
-  const BATCH = 6;
-  for (let i = 0; i < samples.length; i += BATCH) {
-    const results = await Promise.allSettled(samples.slice(i, i + BATCH).map(fetchNear));
-    for (const r of results) {
-      if (r.status === 'fulfilled') {
-        for (const page of r.value) byId.set(page.pageid, page);
-      }
-    }
-  }
-  if (byId.size === 0) throw new Error('Wikipedia returned no places');
-
+function pagesToStops(pages: Iterable<WikiPage>): Stop[] {
   const stops: Stop[] = [];
-  for (const page of byId.values()) {
+  for (const page of pages) {
     const coord = page.coordinates?.[0];
     if (!coord) continue;
     const cat = categorizeWiki(page.title, page.description);
@@ -262,4 +250,22 @@ export async function fetchWikiStops(samples: LatLng[]): Promise<Stop[]> {
     });
   }
   return stops;
+}
+
+// Long routes need several request rounds; onPartial streams the cumulative
+// results after each round so the first stops render while the rest load.
+export async function fetchWikiStops(samples: LatLng[], onPartial?: (stops: Stop[]) => void): Promise<Stop[]> {
+  const byId = new Map<number, WikiPage>();
+  const BATCH = 12;
+  for (let i = 0; i < samples.length; i += BATCH) {
+    const results = await Promise.allSettled(samples.slice(i, i + BATCH).map(fetchNear));
+    for (const r of results) {
+      if (r.status === 'fulfilled') {
+        for (const page of r.value) byId.set(page.pageid, page);
+      }
+    }
+    if (onPartial && byId.size > 0 && i + BATCH < samples.length) onPartial(pagesToStops(byId.values()));
+  }
+  if (byId.size === 0) throw new Error('Wikipedia returned no places');
+  return pagesToStops(byId.values());
 }

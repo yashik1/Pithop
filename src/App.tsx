@@ -11,6 +11,31 @@ import { fmtDur } from './lib/format';
 import { MapView } from './MapView';
 import { PlaceInput } from './components/PlaceInput';
 
+// Last successful trip, persisted so it survives restarts and works with no
+// signal: reopening the app offline restores the route, stops and plan.
+const TRIP_KEY = 'sidequest-trip-v1';
+
+interface SavedTrip {
+  fromText: string;
+  toText: string;
+  routeLabel: string;
+  route: RouteResult;
+  stops: Stop[];
+  planIds: string[];
+}
+
+function loadSavedTrip(): SavedTrip | null {
+  try {
+    const raw = localStorage.getItem(TRIP_KEY);
+    if (!raw) return null;
+    const trip = JSON.parse(raw) as SavedTrip;
+    if (!trip.route?.coords?.length || !Array.isArray(trip.stops) || !trip.stops.length) return null;
+    return trip;
+  } catch {
+    return null;
+  }
+}
+
 const DETOUR_OPTIONS = [5, 10, 15, 25, 40];
 const VISIT_OPTIONS = [
   { label: 'Quick stop (≤ 15 min)', max: 15 },
@@ -76,6 +101,46 @@ export default function App() {
   // overwrite the results of a newer one.
   const searchSeq = useRef(0);
 
+  // Restore the last planned trip on startup — works fully offline since
+  // everything needed (route, stops, plan) comes from localStorage.
+  useEffect(() => {
+    const saved = loadSavedTrip();
+    if (!saved) return;
+    const calcRoute = simplify(saved.route.coords, 1500);
+    routeCalcRef.current = { calcRoute, cum: cumulativeKm(calcRoute) };
+    routeEndsRef.current = {
+      from: saved.route.coords[0],
+      to: saved.route.coords[saved.route.coords.length - 1],
+    };
+    setFromText(saved.fromText);
+    setToText(saved.toText);
+    setRoute(saved.route);
+    setRouteLabel(saved.routeLabel);
+    setStops(saved.stops);
+    setPlanIds(new Set(saved.planIds));
+    if (!navigator.onLine) setNotice('You are offline — showing your saved trip.');
+  }, []);
+
+  // Keep the saved trip current (plan edits included). Route geometry is
+  // simplified before writing to stay well inside localStorage quotas.
+  useEffect(() => {
+    if (!route || stops.length === 0) return;
+    try {
+      const payload: SavedTrip = {
+        fromText,
+        toText,
+        routeLabel,
+        route: { ...route, coords: simplify(route.coords, 1500) },
+        stops,
+        planIds: [...planIds],
+      };
+      localStorage.setItem(TRIP_KEY, JSON.stringify(payload));
+    } catch {
+      // Storage full or blocked — the app still works, just without offline restore.
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [route, stops, planIds, routeLabel]);
+
   async function findStops() {
     const token = ++searchSeq.current;
     const fresh = () => searchSeq.current === token;
@@ -89,8 +154,10 @@ export default function App() {
     setAheadOnly(false);
     setMyAlongKm(null);
     try {
-      const from = fromPick ? { ...fromPick, displayName: fromText } : await geocode(fromText);
-      const to = toPick ? { ...toPick, displayName: toText } : await geocode(toText);
+      const [from, to] = await Promise.all([
+        fromPick ? Promise.resolve({ ...fromPick, displayName: fromText }) : geocode(fromText),
+        toPick ? Promise.resolve({ ...toPick, displayName: toText }) : geocode(toText),
+      ]);
       if (!fresh()) return;
       routeEndsRef.current = { from: { lat: from.lat, lng: from.lng }, to: { lat: to.lat, lng: to.lng } };
       setBusy('Calculating route…');
@@ -129,8 +196,19 @@ export default function App() {
         .catch(() => []);
       let wikiStops: Stop[] = [];
       let wikiError = false;
+      // Paint each round of Wikipedia results as it lands — the first stops
+      // show within a couple of seconds instead of after the whole corridor.
+      const paintPartial = (raw: Stop[]) => {
+        if (!fresh()) return;
+        const enriched = enrich(raw);
+        if (!enriched.length) return;
+        wikiStops = enriched;
+        setStops(enriched);
+        setBusy(null);
+        setNotice('Found the first stops — still scanning the rest of your route…');
+      };
       try {
-        wikiStops = enrich(await fetchWikiStops(samples));
+        wikiStops = enrich(await fetchWikiStops(samples, paintPartial));
       } catch {
         wikiError = true;
       }
