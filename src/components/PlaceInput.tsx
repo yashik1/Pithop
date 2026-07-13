@@ -12,18 +12,31 @@ interface PhotonFeature {
     name?: string;
     housenumber?: string;
     street?: string;
+    district?: string;
     city?: string;
+    county?: string;
     state?: string;
+    postcode?: string;
     country?: string;
   };
 }
 
+// Turn on with ?debug in the URL (or localStorage 'sq-debug' = '1') to see the
+// raw Photon responses in the console — the fastest way to tell "the data
+// doesn't have this address" apart from "the app mislabeled it".
+const DEBUG =
+  typeof window !== 'undefined' &&
+  (new URLSearchParams(window.location.search).has('debug') || window.localStorage.getItem('sq-debug') === '1');
+
 // Street addresses come back as housenumber/street with no name — join them
 // so "782 Bethany Crescent" shows instead of collapsing to just the city.
+// district/county/postcode fill in the rest of the address when present.
 function toLabel(f: PhotonFeature): string {
   const p = f.properties;
   const street = [p.housenumber, p.street].filter(Boolean).join(' ');
-  const parts = [p.name, street, p.city, p.state, p.country].filter(Boolean) as string[];
+  const parts = [p.name, street, p.district, p.city ?? p.county, p.state, p.postcode, p.country].filter(
+    Boolean,
+  ) as string[];
   return [...new Set(parts)].join(', ');
 }
 
@@ -67,8 +80,14 @@ export function PlaceInput({ value, placeholder, onChange, onSelect }: Props) {
         const res = await fetch(`https://photon.komoot.io/api/?q=${encodeURIComponent(value)}&limit=6`, {
           signal: ctrl.signal,
         });
-        if (!res.ok) return;
+        if (!res.ok) {
+          if (DEBUG) console.warn(`[sq-debug] Photon HTTP ${res.status} for "${value}"`);
+          return;
+        }
         const data = await res.json();
+        if (DEBUG) {
+          console.log(`[sq-debug] Photon raw response for "${value}":`, JSON.stringify(data.features ?? [], null, 2));
+        }
         const seen = new Set<string>();
         const picks: PlacePick[] = [];
         for (const f of (data.features ?? []) as PhotonFeature[]) {
@@ -77,6 +96,7 @@ export function PlaceInput({ value, placeholder, onChange, onSelect }: Props) {
           seen.add(label);
           picks.push({ label, lat: f.geometry.coordinates[1], lng: f.geometry.coordinates[0] });
         }
+        if (DEBUG) console.table(picks.map((p) => ({ label: p.label, lat: p.lat, lng: p.lng })));
         setItems(picks);
         setOpen(picks.length > 0);
         setActive(-1);
