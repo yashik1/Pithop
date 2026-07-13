@@ -9,6 +9,7 @@ import { CATEGORIES, CATEGORY_MAP, type CategoryId } from './lib/categories';
 import { cumulativeKm, haversineKm, projectOntoRoute, sampleAlong, simplify, type LatLng } from './lib/geo';
 import { fmtDur } from './lib/format';
 import { MapView } from './MapView';
+import { PlaceInput } from './components/PlaceInput';
 
 const DETOUR_OPTIONS = [5, 10, 15, 25, 40];
 const VISIT_OPTIONS = [
@@ -48,6 +49,10 @@ function mergeStops(primary: Stop[], secondary: Stop[]): Stop[] {
 export default function App() {
   const [fromText, setFromText] = useState('');
   const [toText, setToText] = useState('');
+  // Exact coordinates from a chosen autocomplete suggestion (or the geolocation
+  // button); when set, the search skips geocoding the typed text.
+  const [fromPick, setFromPick] = useState<LatLng | null>(null);
+  const [toPick, setToPick] = useState<LatLng | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -82,8 +87,8 @@ export default function App() {
     setAheadOnly(false);
     setMyAlongKm(null);
     try {
-      const from = await geocode(fromText);
-      const to = await geocode(toText);
+      const from = fromPick ? { ...fromPick, displayName: fromText } : await geocode(fromText);
+      const to = toPick ? { ...toPick, displayName: toText } : await geocode(toText);
       if (!fresh()) return;
       routeEndsRef.current = { from: { lat: from.lat, lng: from.lng }, to: { lat: to.lat, lng: to.lng } };
       setBusy('Calculating route…');
@@ -241,7 +246,10 @@ export default function App() {
       return;
     }
     navigator.geolocation.getCurrentPosition(
-      (pos) => setFromText(`${pos.coords.latitude.toFixed(5)}, ${pos.coords.longitude.toFixed(5)}`),
+      (pos) => {
+        setFromText('My location');
+        setFromPick({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+      },
       () => setError('Could not get your location — check location permissions'),
       { enableHighAccuracy: true, timeout: 10000 },
     );
@@ -289,16 +297,34 @@ export default function App() {
             }}
           >
             <div className="from-row">
-              <input
+              <PlaceInput
                 value={fromText}
-                onChange={(e) => setFromText(e.target.value)}
                 placeholder="From — city, address or 📍"
+                onChange={(t) => {
+                  setFromText(t);
+                  setFromPick(null);
+                }}
+                onSelect={(p) => {
+                  setFromText(p.label);
+                  setFromPick({ lat: p.lat, lng: p.lng });
+                }}
               />
               <button type="button" className="geo-btn" title="Use my location" onClick={useMyLocation}>
                 📍
               </button>
             </div>
-            <input value={toText} onChange={(e) => setToText(e.target.value)} placeholder="To — city or address" />
+            <PlaceInput
+              value={toText}
+              placeholder="To — city or address"
+              onChange={(t) => {
+                setToText(t);
+                setToPick(null);
+              }}
+              onSelect={(p) => {
+                setToText(p.label);
+                setToPick({ lat: p.lat, lng: p.lng });
+              }}
+            />
             <button type="submit" className={`go-btn${busy ? ' busy' : ''}`} disabled={!!busy || !fromText.trim() || !toText.trim()}>
               {busy ?? 'Find stops along the way'}
             </button>

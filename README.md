@@ -20,7 +20,8 @@ No API keys required.
 
 | Concern | Service | Notes |
 | --- | --- | --- |
-| Geocoding | [Nominatim](https://nominatim.org/) | Free, ~1 req/s fair-use limit |
+| Autocomplete | [Photon](https://photon.komoot.io/) (OSM) | Free search-as-you-type; chosen suggestions carry exact coordinates |
+| Geocoding fallback | [Nominatim](https://nominatim.org/) | For free-typed text, ~1 req/s fair-use limit |
 | Driving route | [OSRM demo server](https://project-osrm.org/) | Free demo instance, no SLA |
 | Landmarks & attractions | Wikipedia GeoSearch API | Fast, includes descriptions + photos |
 | Food, viewpoints, rest stops | [Overpass API](https://overpass-api.de/) (OpenStreetMap) | Often busy — treated as best-effort |
