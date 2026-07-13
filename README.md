@@ -7,6 +7,13 @@ along a corridor around it — each with an **estimated visit time** and an
 much time you're willing to spend, then build a stop list that shows the total
 added time for your trip.
 
+Tap any stop to expand it: you get a photo, a short intro pulled from the
+Wikipedia article, and a **"what you can do here"** hint (e.g. parks → walk a
+trail or picnic; viewpoints → quick photo stop) plus Wikipedia / Google Maps
+links. Roadside stops from OpenStreetMap show extra detail from their map
+tags — cuisine and opening hours for food, restrooms/picnic tables for rest
+areas — and Google-sourced places include Google's editorial summary.
+
 ## Run it
 
 ```bash

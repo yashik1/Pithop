@@ -99,6 +99,7 @@ export async function fetchGooglePlaces(routeCoords: LatLng[]): Promise<Stop[]> 
       kind: cat.kind,
       visitMin: visitMinutes(cat.kind),
       source: 'google',
+      description: place.editorialSummary?.text,
       rating: place.rating,
       ratingCount: place.userRatingCount,
       gmapsUri: place.googleMapsUri,

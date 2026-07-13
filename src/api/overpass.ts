@@ -60,6 +60,36 @@ async function runQuery(endpoint: string, query: string): Promise<OverpassElemen
   }
 }
 
+// Turn raw OSM tags into a short human-readable "what's here" line, e.g.
+// "Mexican, barbecue · Outdoor seating · Open Mo-Su 07:00-22:00" for a
+// restaurant or "Restrooms · Picnic tables" for a rest area.
+function describeOsm(tags: Record<string, string>, kind: string): string | undefined {
+  const parts: string[] = [];
+  if (tags.description) parts.push(tags.description.slice(0, 140));
+  if (FOOD_KINDS.includes(kind) && tags.cuisine) {
+    const cuisines = tags.cuisine
+      .split(';')
+      .slice(0, 3)
+      .map((c) => c.trim().replace(/_/g, ' '))
+      .filter(Boolean)
+      .map((c) => c.charAt(0).toUpperCase() + c.slice(1));
+    if (cuisines.length) parts.push(cuisines.join(', '));
+  }
+  const features: string[] = [];
+  if (kind !== 'toilets' && tags.toilets === 'yes') features.push('Restrooms');
+  if (tags.picnic_table === 'yes' || tags.leisure === 'picnic_table') features.push('Picnic tables');
+  if (tags.drinking_water === 'yes') features.push('Drinking water');
+  if (tags.shower === 'yes') features.push('Showers');
+  if (tags.shop === 'convenience') features.push('Convenience store');
+  if (tags.outdoor_seating === 'yes') features.push('Outdoor seating');
+  if (tags.drive_through === 'yes') features.push('Drive-through');
+  if (features.length) parts.push(features.join(' · '));
+  if (tags.opening_hours) {
+    parts.push(tags.opening_hours === '24/7' ? 'Open 24/7' : `Open ${tags.opening_hours.slice(0, 40)}`);
+  }
+  return parts.length ? parts.join(' · ') : undefined;
+}
+
 function categorizeOsm(tags: Record<string, string>): { category: CategoryId; kind: string; name: string } | null {
   if (tags.tourism === 'viewpoint') {
     return { category: 'views', kind: 'viewpoint', name: tags.name ?? 'Scenic viewpoint' };
@@ -119,6 +149,7 @@ export async function fetchRoadsideStops(samples: LatLng[]): Promise<Stop[]> {
       kind: cat.kind,
       visitMin: visitMinutes(cat.kind),
       source: 'osm',
+      description: describeOsm(tags, cat.kind),
       offRouteKm: 0,
       alongKm: 0,
       detourMin: 0,
