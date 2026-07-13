@@ -3,7 +3,7 @@ import { geocode } from './api/geocode';
 import { fetchRoute, type RouteResult } from './api/route';
 import { fetchRoadsideStops } from './api/overpass';
 import { fetchWikiExtract, fetchWikiStops } from './api/wikipedia';
-import { fetchGooglePlaces, fetchGoogleRoute, hasGoogleBackend } from './api/googleBackend';
+import { fetchGeoapifyRoadside, hasGeoapify } from './api/geoapify';
 import type { Stop } from './types';
 import { CATEGORIES, CATEGORY_MAP, thingsToDo, type CategoryId } from './lib/categories';
 import { cumulativeKm, haversineKm, projectOntoRoute, sampleAlong, simplify, type LatLng } from './lib/geo';
@@ -91,10 +91,8 @@ export default function App() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   // Fuller Wikipedia intro per stop id ('' = fetched, nothing usable).
   const [wikiIntros, setWikiIntros] = useState<Record<string, string>>({});
-  const [traffic, setTraffic] = useState<{ durationMin: number; orderedIds: string[] } | null>(null);
   const [aheadOnly, setAheadOnly] = useState(false);
   const [myAlongKm, setMyAlongKm] = useState<number | null>(null);
-  const routeEndsRef = useRef<{ from: LatLng; to: LatLng } | null>(null);
   const routeCalcRef = useRef<{ calcRoute: LatLng[]; cum: number[] } | null>(null);
 
   // Bumped on every new search so a slow response from an old search can't
@@ -108,10 +106,6 @@ export default function App() {
     if (!saved) return;
     const calcRoute = simplify(saved.route.coords, 1500);
     routeCalcRef.current = { calcRoute, cum: cumulativeKm(calcRoute) };
-    routeEndsRef.current = {
-      from: saved.route.coords[0],
-      to: saved.route.coords[saved.route.coords.length - 1],
-    };
     setFromText(saved.fromText);
     setToText(saved.toText);
     setRoute(saved.route);
@@ -150,7 +144,6 @@ export default function App() {
     setStops([]);
     setPlanIds(new Set());
     setSelectedId(null);
-    setTraffic(null);
     setAheadOnly(false);
     setMyAlongKm(null);
     try {
@@ -159,7 +152,6 @@ export default function App() {
         toPick ? Promise.resolve({ ...toPick, displayName: toText }) : geocode(toText),
       ]);
       if (!fresh()) return;
-      routeEndsRef.current = { from: { lat: from.lat, lng: from.lng }, to: { lat: to.lat, lng: to.lng } };
       setBusy('Calculating route…');
       const r = await fetchRoute(from, to);
       if (!fresh()) return;
@@ -188,12 +180,11 @@ export default function App() {
           .filter((s) => s.offRouteKm <= 12)
           .sort((a, b) => a.alongKm - b.alongKm);
 
-      // Overpass can be slow or busy — show Wikipedia landmarks as soon as
-      // they're ready and merge the other sources in whenever they arrive.
-      const osmPromise = fetchRoadsideStops(samples);
-      const googlePromise: Promise<Stop[]> = hasGoogleBackend()
-        .then((ok) => (ok ? fetchGooglePlaces(simplify(r.coords, 90)) : []))
-        .catch(() => []);
+      // Roadside data (food, fuel, rest areas) comes from Geoapify when a key
+      // is configured, else the free Overpass servers. Either way it can be
+      // slow — show Wikipedia landmarks as soon as they're ready and merge
+      // the roadside stops in whenever they arrive.
+      const roadsidePromise = hasGeoapify() ? fetchGeoapifyRoadside(samples) : fetchRoadsideStops(samples);
       let wikiStops: Stop[] = [];
       let wikiError = false;
       // Paint each round of Wikipedia results as it lands — the first stops
@@ -219,19 +210,18 @@ export default function App() {
         setNotice('Adding food, viewpoint and rest-stop data…');
       }
 
-      const [googleSettled, osmSettled] = await Promise.allSettled([googlePromise, osmPromise]);
+      const [roadsideSettled] = await Promise.allSettled([roadsidePromise]);
       if (!fresh()) return;
-      const googleStops = googleSettled.status === 'fulfilled' ? enrich(googleSettled.value) : [];
-      const osmStops = osmSettled.status === 'fulfilled' ? enrich(osmSettled.value) : [];
-      const osmError = osmSettled.status === 'rejected';
-      if (wikiError && osmError && !googleStops.length) {
+      const roadsideStops = roadsideSettled.status === 'fulfilled' ? enrich(roadsideSettled.value) : [];
+      const roadsideError = roadsideSettled.status === 'rejected';
+      if (wikiError && roadsideError) {
         throw new Error('Both place services are unavailable right now — try again in a couple of minutes');
       }
-      setStops(mergeStops(mergeStops(wikiStops, googleStops), osmStops));
-      if (osmError) {
-        setNotice('Live food & rest-stop data (OpenStreetMap) is busy right now — other sources are shown.');
+      setStops(mergeStops(wikiStops, roadsideStops));
+      if (roadsideError) {
+        setNotice('Live food & rest-stop data is busy right now — other sources are shown.');
       } else {
-        setNotice(wikiError ? 'Wikipedia lookup failed — showing the other stop sources only.' : null);
+        setNotice(wikiError ? 'Wikipedia lookup failed — showing roadside stops only.' : null);
       }
     } catch (e) {
       if (!fresh()) return;
@@ -283,35 +273,6 @@ export default function App() {
 
   const plan = useMemo(() => stops.filter((s) => planIds.has(s.id)), [stops, planIds]);
   const planExtraMin = plan.reduce((sum, s) => sum + s.visitMin + s.detourMin, 0);
-  const planVisitMin = plan.reduce((sum, s) => sum + s.visitMin, 0);
-
-  // When the Google proxy is configured, refresh the trip plan with a
-  // traffic-aware total and an optimized stop order (debounced).
-  useEffect(() => {
-    setTraffic(null);
-    const ends = routeEndsRef.current;
-    if (!route || !ends || plan.length === 0 || plan.length > 23) return;
-    let cancelled = false;
-    const timer = setTimeout(async () => {
-      if (!(await hasGoogleBackend()) || cancelled) return;
-      try {
-        const res = await fetchGoogleRoute(
-          ends.from,
-          ends.to,
-          plan.map((p) => ({ lat: p.lat, lng: p.lng })),
-        );
-        if (cancelled) return;
-        const orderedIds = res.order ? res.order.map((i) => plan[i]?.id).filter(Boolean) : plan.map((p) => p.id);
-        setTraffic({ durationMin: res.durationMin, orderedIds });
-      } catch {
-        // Proxy or Routes API unavailable — the heuristic estimate stays.
-      }
-    }, 800);
-    return () => {
-      cancelled = true;
-      clearTimeout(timer);
-    };
-  }, [plan, route]);
 
   // When a Wikipedia stop is opened, pull in the article intro so the card
   // can say more than the one-line short description.
@@ -328,13 +289,6 @@ export default function App() {
       cancelled = true;
     };
   }, [selectedId, wikiIntros]);
-
-  const planDisplay = useMemo(() => {
-    if (!traffic || traffic.orderedIds.length !== plan.length) return plan;
-    const byId = new Map(plan.map((p) => [p.id, p]));
-    const ordered = traffic.orderedIds.map((id) => byId.get(id)).filter((s): s is Stop => Boolean(s));
-    return ordered.length === plan.length ? ordered : plan;
-  }, [plan, traffic]);
 
   function useMyLocation() {
     if (!navigator.geolocation) {
@@ -440,11 +394,6 @@ export default function App() {
               <div className="summary-plan">
                 With your {plan.length} stop{plan.length > 1 ? 's' : ''}: ≈{' '}
                 {fmtDur(route.durationMin + planExtraMin)} total (+{fmtDur(planExtraMin)})
-                {traffic && (
-                  <div className="summary-traffic">
-                    🚦 Google, live traffic via your stops: {fmtDur(traffic.durationMin + planVisitMin)} door-to-door
-                  </div>
-                )}
               </div>
             )}
             {stops.length > 0 && (
@@ -505,11 +454,8 @@ export default function App() {
 
             {plan.length > 0 && (
               <div className="plan">
-                <h2>
-                  Your stops ({plan.length})
-                  {traffic && planDisplay !== plan ? ' · optimized order' : ''}
-                </h2>
-                {planDisplay.map((s) => (
+                <h2>Your stops ({plan.length})</h2>
+                {plan.map((s) => (
                   <div key={s.id} className="plan-item">
                     <span className="plan-name" onClick={() => setSelectedId(s.id)}>
                       {CATEGORY_MAP[s.category].emoji} {s.name}
@@ -545,7 +491,6 @@ export default function App() {
                     <div className="stop-body">
                       <div className="stop-name">{s.name}</div>
                       <div className="stop-meta">
-                        {s.rating ? `★ ${s.rating.toFixed(1)} · ` : ''}
                         {c.label} · ⏱ {fmtDur(s.visitMin)} · 🚗 {s.detourMin} min detour · km {Math.round(s.alongKm)}
                       </div>
                       {s.description && <div className="stop-desc">{s.description}</div>}
@@ -561,9 +506,7 @@ export default function App() {
                               </a>
                             )}
                             <a
-                              href={
-                                s.gmapsUri ?? `https://www.google.com/maps/search/?api=1&query=${s.lat}%2C${s.lng}`
-                              }
+                              href={`https://www.google.com/maps/search/?api=1&query=${s.lat}%2C${s.lng}`}
                               target="_blank"
                               rel="noreferrer"
                             >
@@ -612,6 +555,11 @@ export default function App() {
             </p>
           </div>
         )}
+        <footer className="foot">
+          <a href="/privacy.html" target="_blank" rel="noreferrer">
+            Privacy & data sources
+          </a>
+        </footer>
       </aside>
 
       <MapView

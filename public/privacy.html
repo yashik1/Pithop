@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="robots" content="noindex" />
+    <title>Privacy & Data Sources — SideQuest</title>
+    <style>
+      body {
+        font-family: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+        color: #101d33;
+        background: #f2f5fa;
+        margin: 0;
+        line-height: 1.65;
+      }
+      main {
+        max-width: 720px;
+        margin: 0 auto;
+        padding: 40px 24px 64px;
+      }
+      h1 {
+        font-size: 26px;
+        letter-spacing: -0.02em;
+      }
+      h2 {
+        font-size: 18px;
+        margin-top: 32px;
+      }
+      p,
+      li {
+        font-size: 15px;
+        color: #33415c;
+      }
+      table {
+        border-collapse: collapse;
+        width: 100%;
+        font-size: 14px;
+      }
+      th,
+      td {
+        text-align: left;
+        padding: 8px 10px;
+        border-bottom: 1px solid #e3e9f2;
+        vertical-align: top;
+      }
+      a {
+        color: #1d4ed8;
+      }
+      .updated {
+        color: #7d8ea6;
+        font-size: 13px;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>🛣️ Privacy &amp; Data Sources</h1>
+      <p class="updated">Last updated: July 2026</p>
+
+      <p>
+        SideQuest is a route-planning app that finds interesting stops along a driving route. It is built to know as
+        little about you as possible: <strong>no account, no sign-up, no advertising trackers, no analytics
+        cookies</strong>.
+      </p>
+
+      <h2>What leaves your device</h2>
+      <ul>
+        <li>
+          <strong>The place names you type</strong> (origin, destination, autocomplete text) are sent to a geocoding
+          service to be turned into map coordinates, and those coordinates are sent to a routing service to compute
+          your route.
+        </li>
+        <li>
+          <strong>If you tap 📍 “use my location”</strong>, your device's GPS coordinates are used as the route origin
+          and sent to the routing service like any other origin. The “only stops ahead of me” feature processes your
+          GPS position entirely on your device — it is never uploaded.
+        </li>
+        <li><strong>Route coordinates</strong> are sent to place-data services to find stops along the way.</li>
+      </ul>
+
+      <h2>What stays on your device</h2>
+      <p>
+        Your last trip (route, stops, and the stops you added to your plan) is stored in your browser's local storage
+        so the app works offline. It never leaves your device. To erase it, clear this site's browsing data.
+      </p>
+
+      <h2>Services we rely on</h2>
+      <table>
+        <tr>
+          <th>Purpose</th>
+          <th>Service</th>
+        </tr>
+        <tr>
+          <td>Maps, geocoding, routing, roadside places</td>
+          <td>
+            <a href="https://www.geoapify.com/">Geoapify</a> (when configured), otherwise
+            <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> public services (tiles, Nominatim,
+            Photon, OSRM demo, Overpass)
+          </td>
+        </tr>
+        <tr>
+          <td>Landmark descriptions &amp; photos</td>
+          <td><a href="https://www.wikipedia.org/">Wikipedia / Wikimedia</a> (content under CC BY-SA)</td>
+        </tr>
+        <tr>
+          <td>Hosting</td>
+          <td><a href="https://vercel.com/">Vercel</a> (standard web-server request logs)</td>
+        </tr>
+        <tr>
+          <td>Navigation links</td>
+          <td>“Open in Google Maps” links simply open Google Maps — nothing is shared until you tap one</td>
+        </tr>
+      </table>
+      <p>Each service receives only what is needed for its job and is governed by its own privacy policy.</p>
+
+      <h2>Affiliate disclosure</h2>
+      <p>
+        SideQuest may in the future include clearly labeled affiliate links (for example, to book tickets or hotels).
+        If you buy something through such a link, we may earn a commission at no extra cost to you. There are no
+        affiliate links in the app today.
+      </p>
+
+      <h2>Map data attribution</h2>
+      <p>
+        Map data © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors. Place
+        descriptions from <a href="https://www.wikipedia.org/">Wikipedia</a>, licensed
+        <a href="https://creativecommons.org/licenses/by-sa/4.0/">CC BY-SA</a>. Maps powered by
+        <a href="https://www.geoapify.com/">Geoapify</a> where configured.
+      </p>
+
+      <h2>Contact</h2>
+      <p>
+        Questions or requests? Open an issue on the
+        <a href="https://github.com/yashik1/Side-quest">project's GitHub repository</a>.
+      </p>
+    </main>
+  </body>
+</html>

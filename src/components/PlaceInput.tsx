@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { geoapifySuggest, hasGeoapify } from '../api/geoapify';
 
 export interface PlacePick {
   label: string;
@@ -55,6 +56,7 @@ export function PlaceInput({ value, placeholder, onChange, onSelect }: Props) {
   const [items, setItems] = useState<PlacePick[]>([]);
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState(-1);
+  const inputRef = useRef<HTMLInputElement>(null);
   const debounceRef = useRef<number | undefined>(undefined);
   const ctrlRef = useRef<AbortController | null>(null);
   // Set when a suggestion is chosen so the resulting value change doesn't
@@ -73,28 +75,40 @@ export function PlaceInput({ value, placeholder, onChange, onSelect }: Props) {
       setOpen(false);
       return;
     }
+    // Programmatic changes (example button, trip restore) shouldn't pop the
+    // dropdown — only fetch while the user is actually typing in this field.
+    if (document.activeElement !== inputRef.current) {
+      setItems([]);
+      setOpen(false);
+      return;
+    }
     debounceRef.current = window.setTimeout(async () => {
       const ctrl = new AbortController();
       ctrlRef.current = ctrl;
       try {
-        const res = await fetch(`https://photon.komoot.io/api/?q=${encodeURIComponent(value)}&limit=6`, {
-          signal: ctrl.signal,
-        });
-        if (!res.ok) {
-          if (DEBUG) console.warn(`[sq-debug] Photon HTTP ${res.status} for "${value}"`);
-          return;
-        }
-        const data = await res.json();
-        if (DEBUG) {
-          console.log(`[sq-debug] Photon raw response for "${value}":`, JSON.stringify(data.features ?? [], null, 2));
-        }
-        const seen = new Set<string>();
-        const picks: PlacePick[] = [];
-        for (const f of (data.features ?? []) as PhotonFeature[]) {
-          const label = toLabel(f);
-          if (!label || seen.has(label)) continue;
-          seen.add(label);
-          picks.push({ label, lat: f.geometry.coordinates[1], lng: f.geometry.coordinates[0] });
+        let picks: PlacePick[];
+        if (hasGeoapify()) {
+          picks = await geoapifySuggest(value, ctrl.signal);
+        } else {
+          const res = await fetch(`https://photon.komoot.io/api/?q=${encodeURIComponent(value)}&limit=6`, {
+            signal: ctrl.signal,
+          });
+          if (!res.ok) {
+            if (DEBUG) console.warn(`[sq-debug] Photon HTTP ${res.status} for "${value}"`);
+            return;
+          }
+          const data = await res.json();
+          if (DEBUG) {
+            console.log(`[sq-debug] Photon raw response for "${value}":`, JSON.stringify(data.features ?? [], null, 2));
+          }
+          const seen = new Set<string>();
+          picks = [];
+          for (const f of (data.features ?? []) as PhotonFeature[]) {
+            const label = toLabel(f);
+            if (!label || seen.has(label)) continue;
+            seen.add(label);
+            picks.push({ label, lat: f.geometry.coordinates[1], lng: f.geometry.coordinates[0] });
+          }
         }
         if (DEBUG) console.table(picks.map((p) => ({ label: p.label, lat: p.lat, lng: p.lng })));
         setItems(picks);
@@ -133,6 +147,7 @@ export function PlaceInput({ value, placeholder, onChange, onSelect }: Props) {
   return (
     <div className="place-input">
       <input
+        ref={inputRef}
         value={value}
         placeholder={placeholder}
         onChange={(e) => onChange(e.target.value)}

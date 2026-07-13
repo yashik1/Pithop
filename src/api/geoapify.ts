@@ -1,0 +1,166 @@
+// Optional commercial-grade provider (geoapify.com). When VITE_GEOAPIFY_API_KEY
+// is set, Geoapify replaces every free public OSM server — tiles, autocomplete,
+// geocoding, routing and roadside POIs — whose usage policies disallow or
+// discourage commercial apps. Without a key the app stays on the free stack.
+// Geoapify uses open data and allows commercial use with attribution; restrict
+// the key to your domain in their dashboard since it ships to the browser.
+
+import type { LatLng } from '../lib/geo';
+import type { Stop } from '../types';
+import { visitMinutes, type CategoryId } from '../lib/categories';
+import { describeOsm } from './overpass';
+import type { GeocodeResult } from './geocode';
+import type { RouteResult } from './route';
+import type { PlacePick } from '../components/PlaceInput';
+
+const KEY = (import.meta.env.VITE_GEOAPIFY_API_KEY as string | undefined) ?? '';
+const BASE = 'https://api.geoapify.com';
+
+export function hasGeoapify(): boolean {
+  return KEY.length > 0;
+}
+
+export function geoapifyTileLayer(): { url: string; attribution: string } {
+  return {
+    url: `https://maps.geoapify.com/v1/tile/osm-bright/{z}/{x}/{y}.png?apiKey=${KEY}`,
+    attribution:
+      'Powered by <a href="https://www.geoapify.com/">Geoapify</a> | ' +
+      '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+  };
+}
+
+interface GeoFeature {
+  geometry: { type: string; coordinates: any };
+  properties: Record<string, any>;
+}
+
+async function getJson(url: string, signal?: AbortSignal): Promise<{ features?: GeoFeature[] }> {
+  const res = await fetch(url, { signal });
+  if (!res.ok) throw new Error(`Geoapify request failed (HTTP ${res.status})`);
+  return res.json();
+}
+
+export async function geoapifySuggest(text: string, signal?: AbortSignal): Promise<PlacePick[]> {
+  const data = await getJson(
+    `${BASE}/v1/geocode/autocomplete?text=${encodeURIComponent(text)}&limit=6&apiKey=${KEY}`,
+    signal,
+  );
+  const picks: PlacePick[] = [];
+  for (const f of data.features ?? []) {
+    const label = f.properties.formatted;
+    const [lng, lat] = f.geometry?.coordinates ?? [f.properties.lon, f.properties.lat];
+    if (!label || lat == null || lng == null) continue;
+    picks.push({ label, lat, lng });
+  }
+  return picks;
+}
+
+export async function geoapifyGeocode(query: string): Promise<GeocodeResult> {
+  const data = await getJson(`${BASE}/v1/geocode/search?text=${encodeURIComponent(query)}&limit=1&apiKey=${KEY}`);
+  const f = data.features?.[0];
+  if (!f) throw new Error(`Couldn't find "${query}" — try a more specific place name`);
+  const [lng, lat] = f.geometry?.coordinates ?? [f.properties.lon, f.properties.lat];
+  return { lat, lng, displayName: f.properties.formatted ?? query };
+}
+
+export async function geoapifyRoute(from: LatLng, to: LatLng): Promise<RouteResult> {
+  const data = await getJson(
+    `${BASE}/v1/routing?waypoints=${from.lat},${from.lng}%7C${to.lat},${to.lng}&mode=drive&apiKey=${KEY}`,
+  );
+  const f = data.features?.[0];
+  if (!f) throw new Error('No drivable route found between those places');
+  // Routing returns a MultiLineString with one line per leg — flatten them.
+  const lines: Array<Array<[number, number]>> =
+    f.geometry.type === 'MultiLineString' ? f.geometry.coordinates : [f.geometry.coordinates];
+  const coords: LatLng[] = [];
+  for (const line of lines) for (const [lng, lat] of line) coords.push({ lat, lng });
+  if (coords.length < 2) throw new Error('No drivable route found between those places');
+  return {
+    coords,
+    distanceKm: (f.properties.distance ?? 0) / 1000,
+    durationMin: (f.properties.time ?? 0) / 60,
+  };
+}
+
+// Roadside POIs (replaces Overpass): food, fuel, rest areas, viewpoints.
+// If the API rejects a category slug (400), retry with the safest subset so a
+// taxonomy change degrades coverage instead of killing the whole layer.
+const CATEGORIES_FULL =
+  'catering.restaurant,catering.cafe,catering.fast_food,catering.ice_cream,fuel,rest_area,tourism.attraction.viewpoint';
+const CATEGORIES_SAFE = 'catering,fuel';
+
+function categorizeGeoapify(cats: string[]): { category: CategoryId; kind: string } | null {
+  const has = (c: string) => cats.some((x) => x === c || x.startsWith(c + '.'));
+  if (has('tourism.attraction.viewpoint')) return { category: 'views', kind: 'viewpoint' };
+  if (has('rest_area')) return { category: 'rest', kind: 'rest_area' };
+  if (has('fuel')) return { category: 'rest', kind: 'fuel' };
+  if (has('catering.fast_food')) return { category: 'food', kind: 'fast_food' };
+  if (has('catering.ice_cream')) return { category: 'food', kind: 'ice_cream' };
+  if (has('catering.cafe')) return { category: 'food', kind: 'cafe' };
+  if (has('catering')) return { category: 'food', kind: 'restaurant' };
+  return null;
+}
+
+export async function fetchGeoapifyRoadside(samples: LatLng[]): Promise<Stop[]> {
+  // Every 2nd sample with a wider radius halves the credit cost per search.
+  const circles = samples.filter((_, i) => i % 2 === 0);
+  const radiusM = 13000;
+
+  const fetchCircle = (p: LatLng, categories: string) =>
+    getJson(
+      `${BASE}/v2/places?categories=${categories}` +
+        `&filter=circle:${p.lng.toFixed(4)},${p.lat.toFixed(4)},${radiusM}&limit=100&apiKey=${KEY}`,
+    );
+
+  let categories = CATEGORIES_FULL;
+  try {
+    // Probe the first circle; on a category-taxonomy 400 fall back before fanning out.
+    await fetchCircle(circles[0], categories);
+  } catch {
+    categories = CATEGORIES_SAFE;
+  }
+
+  const results = await Promise.allSettled(circles.map((p) => fetchCircle(p, categories)));
+  const byId = new Map<string, Stop>();
+  let anyOk = false;
+  for (const r of results) {
+    if (r.status !== 'fulfilled') continue;
+    anyOk = true;
+    for (const f of r.value.features ?? []) {
+      const props = f.properties;
+      const id = `gfy/${props.place_id ?? `${props.lat},${props.lon}`}`;
+      if (byId.has(id)) continue;
+      const cat = categorizeGeoapify(props.categories ?? []);
+      if (!cat) continue;
+      const lat = props.lat ?? f.geometry?.coordinates?.[1];
+      const lng = props.lon ?? f.geometry?.coordinates?.[0];
+      if (lat == null || lng == null) continue;
+      // Unnamed food places aren't useful stops; rest stops get default names.
+      let name: string | undefined = props.name;
+      if (!name) {
+        if (cat.kind === 'rest_area') name = 'Rest area';
+        else if (cat.kind === 'fuel') name = props.brand ?? 'Fuel station';
+        else if (cat.kind === 'viewpoint') name = 'Scenic viewpoint';
+      }
+      if (!name) continue;
+      // datasource.raw carries the original OSM tags (cuisine, opening_hours…).
+      const raw: Record<string, string> = props.datasource?.raw ?? {};
+      byId.set(id, {
+        id,
+        name,
+        lat,
+        lng,
+        category: cat.category,
+        kind: cat.kind,
+        visitMin: visitMinutes(cat.kind),
+        source: 'geoapify',
+        description: describeOsm(raw, cat.kind),
+        offRouteKm: 0,
+        alongKm: 0,
+        detourMin: 0,
+      });
+    }
+  }
+  if (!anyOk) throw new Error('Geoapify places lookup failed');
+  return [...byId.values()];
+}
