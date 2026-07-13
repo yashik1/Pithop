@@ -2,10 +2,10 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { geocode } from './api/geocode';
 import { fetchRoute, type RouteResult } from './api/route';
 import { fetchRoadsideStops } from './api/overpass';
-import { fetchWikiStops } from './api/wikipedia';
+import { fetchWikiExtract, fetchWikiStops } from './api/wikipedia';
 import { fetchGooglePlaces, fetchGoogleRoute, hasGoogleBackend } from './api/googleBackend';
 import type { Stop } from './types';
-import { CATEGORIES, CATEGORY_MAP, type CategoryId } from './lib/categories';
+import { CATEGORIES, CATEGORY_MAP, thingsToDo, type CategoryId } from './lib/categories';
 import { cumulativeKm, haversineKm, projectOntoRoute, sampleAlong, simplify, type LatLng } from './lib/geo';
 import { fmtDur } from './lib/format';
 import { MapView } from './MapView';
@@ -64,6 +64,8 @@ export default function App() {
   const [maxVisit, setMaxVisit] = useState(9999);
   const [planIds, setPlanIds] = useState<Set<string>>(new Set());
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  // Fuller Wikipedia intro per stop id ('' = fetched, nothing usable).
+  const [wikiIntros, setWikiIntros] = useState<Record<string, string>>({});
   const [traffic, setTraffic] = useState<{ durationMin: number; orderedIds: string[] } | null>(null);
   const [aheadOnly, setAheadOnly] = useState(false);
   const [myAlongKm, setMyAlongKm] = useState<number | null>(null);
@@ -232,6 +234,22 @@ export default function App() {
       clearTimeout(timer);
     };
   }, [plan, route]);
+
+  // When a Wikipedia stop is opened, pull in the article intro so the card
+  // can say more than the one-line short description.
+  useEffect(() => {
+    if (!selectedId || !selectedId.startsWith('wiki/') || selectedId in wikiIntros) return;
+    const pageid = Number(selectedId.slice('wiki/'.length));
+    if (!Number.isFinite(pageid)) return;
+    const id = selectedId;
+    let cancelled = false;
+    void fetchWikiExtract(pageid).then((text) => {
+      if (!cancelled) setWikiIntros((prev) => ({ ...prev, [id]: text ?? '' }));
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedId, wikiIntros]);
 
   const planDisplay = useMemo(() => {
     if (!traffic || traffic.orderedIds.length !== plan.length) return plan;
@@ -435,10 +453,12 @@ export default function App() {
               {filtered.slice(0, LIST_CAP).map((s) => {
                 const c = CATEGORY_MAP[s.category];
                 const added = planIds.has(s.id);
+                const selected = selectedId === s.id;
+                const intro = wikiIntros[s.id];
                 return (
                   <div
                     key={s.id}
-                    className={`stop-card${selectedId === s.id ? ' selected' : ''}`}
+                    className={`stop-card${selected ? ' selected' : ''}`}
                     onClick={() => setSelectedId(s.id)}
                   >
                     <div className="stop-icon" style={{ background: c.color + '26' }}>
@@ -451,6 +471,29 @@ export default function App() {
                         {c.label} · ⏱ {fmtDur(s.visitMin)} · 🚗 {s.detourMin} min detour · km {Math.round(s.alongKm)}
                       </div>
                       {s.description && <div className="stop-desc">{s.description}</div>}
+                      {selected && (
+                        <div className="stop-details">
+                          {s.imageUrl && <img className="stop-photo" src={s.imageUrl} alt={s.name} loading="lazy" />}
+                          {intro && intro !== s.description && <p className="stop-intro">{intro}</p>}
+                          <p className="stop-todo">💡 {thingsToDo(s.kind)}</p>
+                          <div className="stop-links" onClick={(e) => e.stopPropagation()}>
+                            {s.wikiUrl && (
+                              <a href={s.wikiUrl} target="_blank" rel="noreferrer">
+                                Wikipedia ↗
+                              </a>
+                            )}
+                            <a
+                              href={
+                                s.gmapsUri ?? `https://www.google.com/maps/search/?api=1&query=${s.lat}%2C${s.lng}`
+                              }
+                              target="_blank"
+                              rel="noreferrer"
+                            >
+                              Google Maps ↗
+                            </a>
+                          </div>
+                        </div>
+                      )}
                     </div>
                     <button
                       type="button"

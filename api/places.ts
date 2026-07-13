@@ -9,7 +9,7 @@ const DEFAULT_QUERIES = [
 ];
 
 const FIELD_MASK =
-  'places.id,places.displayName,places.location,places.rating,places.userRatingCount,places.primaryType,places.googleMapsUri';
+  'places.id,places.displayName,places.location,places.rating,places.userRatingCount,places.primaryType,places.googleMapsUri,places.editorialSummary';
 
 // Standard Google polyline5 encoding.
 function encodeDiff(v: number): string {

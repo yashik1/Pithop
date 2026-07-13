@@ -188,6 +188,32 @@ function categorizeWiki(title: string, description: string | undefined): { categ
   return null;
 }
 
+// Fuller "what is this place" text, fetched lazily when a traveller opens a
+// stop (one request per page, cached for the session). The geosearch response
+// only carries the terse short description; this adds the article intro.
+const extractCache = new Map<number, Promise<string | null>>();
+
+export function fetchWikiExtract(pageid: number): Promise<string | null> {
+  let cached = extractCache.get(pageid);
+  if (!cached) {
+    cached = (async () => {
+      const url =
+        `https://en.wikipedia.org/w/api.php?action=query&format=json&origin=*` +
+        `&prop=extracts&exintro=1&explaintext=1&exsentences=3&pageids=${pageid}`;
+      const res = await fetch(url);
+      if (!res.ok) throw new Error(`Wikipedia extract failed (HTTP ${res.status})`);
+      const data = await res.json();
+      const text: string | undefined = data.query?.pages?.[pageid]?.extract;
+      return text?.trim() || null;
+    })().catch(() => {
+      extractCache.delete(pageid); // allow a retry next time the stop is opened
+      return null;
+    });
+    extractCache.set(pageid, cached);
+  }
+  return cached;
+}
+
 async function fetchNear(p: LatLng): Promise<WikiPage[]> {
   const url =
     `https://en.wikipedia.org/w/api.php?action=query&format=json&origin=*` +

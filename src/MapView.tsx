@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react';
 import L from 'leaflet';
 import type { RouteResult } from './api/route';
 import type { Stop } from './types';
-import { CATEGORY_MAP } from './lib/categories';
+import { CATEGORY_MAP, thingsToDo } from './lib/categories';
 import { fmtDur } from './lib/format';
 
 interface Props {
@@ -39,12 +39,14 @@ function buildPopup(stop: Stop, live: { current: LiveProps }): HTMLElement {
     <div class="p-meta">${cat.emoji} ${cat.label}</div>
     ${rating}
     <div class="p-meta">⏱ ~${fmtDur(stop.visitMin)} visit · 🚗 ~${stop.detourMin} min off route</div>
+    <div class="p-todo"></div>
     <div class="p-links"><a class="p-link" href="${gmaps}" target="_blank" rel="noreferrer">Open in Google Maps ↗</a>${wiki}</div>
     <button type="button" class="p-add"></button>`;
   div.querySelector('.p-name')!.textContent = stop.name;
   const desc = div.querySelector<HTMLElement>('.p-desc')!;
   if (stop.description) desc.textContent = stop.description;
   else desc.remove();
+  div.querySelector('.p-todo')!.textContent = `💡 ${thingsToDo(stop.kind)}`;
   const btn = div.querySelector<HTMLButtonElement>('.p-add')!;
   btn.textContent = live.current.planIds.has(stop.id) ? '✓ Added — remove' : '+ Add to trip';
   btn.addEventListener('click', () => {

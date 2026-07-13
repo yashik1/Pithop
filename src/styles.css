@@ -807,6 +807,12 @@ body {
   background: #f3f8ff;
   border-color: rgba(37, 99, 235, 0.55);
   box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.14), var(--shadow-1);
+  align-items: flex-start;
+}
+
+/* The selected card expands into a detail view — let the one-liner wrap. */
+.stop-card.selected .stop-desc {
+  white-space: normal;
 }
 
 /* Tinted background color arrives inline from JS (category color at 15%). */
@@ -852,6 +858,60 @@ body {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+/* Expanded details inside the selected stop card: photo, fuller intro,
+   "what you can do here" hint and outbound links. */
+.stop-details {
+  margin-top: 9px;
+  padding-top: 9px;
+  border-top: 1px solid var(--line);
+  animation: rise-in 0.25s var(--ease-out) backwards;
+}
+
+.stop-photo {
+  display: block;
+  width: 100%;
+  max-height: 150px;
+  object-fit: cover;
+  border-radius: 10px;
+  margin-bottom: 8px;
+  box-shadow: var(--shadow-1);
+}
+
+.stop-intro {
+  margin: 0 0 8px;
+  font-size: 12.5px;
+  line-height: 1.55;
+  color: var(--ink-2);
+}
+
+.stop-todo {
+  margin: 0;
+  padding: 7px 10px;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: #05603f;
+  background: linear-gradient(180deg, #eefcf4, #e5f8ee);
+  border: 1px solid #bfe8d2;
+  border-radius: 10px;
+}
+
+.stop-links {
+  display: flex;
+  gap: 16px;
+  margin-top: 8px;
+}
+
+.stop-links a {
+  color: var(--primary);
+  font-size: 12.5px;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.stop-links a:hover {
+  text-decoration: underline;
 }
 
 .add-btn {
@@ -1004,6 +1064,17 @@ body {
   color: var(--ink-3);
   font-size: 12px;
   margin-top: 3px;
+}
+
+.map-popup .p-todo {
+  margin-top: 7px;
+  padding: 5px 8px;
+  font-size: 12px;
+  line-height: 1.45;
+  color: #05603f;
+  background: #eefcf4;
+  border: 1px solid #bfe8d2;
+  border-radius: 8px;
 }
 
 .map-popup .p-links {
