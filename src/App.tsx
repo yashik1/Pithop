@@ -6,6 +6,7 @@ import { fetchWikiExtract, fetchWikiStops } from './api/wikipedia';
 import { fetchGeoapifyRoadside, hasGeoapify } from './api/geoapify';
 import type { Stop } from './types';
 import { CATEGORIES, CATEGORY_MAP, thingsToDo, type CategoryId } from './lib/categories';
+import { anyAffiliate, gasCashbackLink, hotelsLink, ticketsLink } from './lib/affiliates';
 import { cumulativeKm, haversineKm, projectOntoRoute, sampleAlong, simplify, type LatLng } from './lib/geo';
 import { fmtDur } from './lib/format';
 import { MapView } from './MapView';
@@ -390,6 +391,15 @@ export default function App() {
             <div className="summary-stats">
               {Math.round(route.distanceKm)} km · {fmtDur(route.durationMin)} drive · {stops.length} stops found
             </div>
+            {(() => {
+              const dest = routeLabel.split('→')[1]?.trim();
+              const hotels = dest ? hotelsLink(dest) : null;
+              return hotels ? (
+                <a className="summary-hotels" href={hotels} target="_blank" rel="sponsored noreferrer">
+                  🏨 Hotels in {dest} ↗
+                </a>
+              ) : null;
+            })()}
             {plan.length > 0 && (
               <div className="summary-plan">
                 With your {plan.length} stop{plan.length > 1 ? 's' : ''}: ≈{' '}
@@ -500,6 +510,16 @@ export default function App() {
                           {intro && intro !== s.description && <p className="stop-intro">{intro}</p>}
                           <p className="stop-todo">💡 {thingsToDo(s.kind)}</p>
                           <div className="stop-links" onClick={(e) => e.stopPropagation()}>
+                            {ticketsLink(s.name, s.kind) && (
+                              <a className="aff" href={ticketsLink(s.name, s.kind)!} target="_blank" rel="sponsored noreferrer">
+                                🎟️ Book tickets ↗
+                              </a>
+                            )}
+                            {s.category === 'rest' && gasCashbackLink() && (
+                              <a className="aff" href={gasCashbackLink()!} target="_blank" rel="sponsored noreferrer">
+                                ⛽ Gas cash back ↗
+                              </a>
+                            )}
                             {s.wikiUrl && (
                               <a href={s.wikiUrl} target="_blank" rel="noreferrer">
                                 Wikipedia ↗
@@ -556,6 +576,11 @@ export default function App() {
           </div>
         )}
         <footer className="foot">
+          {anyAffiliate() && (
+            <p className="foot-disclosure">
+              Links marked 🎟️/🏨/⛽ are affiliate links — they support the app at no extra cost to you.
+            </p>
+          )}
           <a href="/privacy.html" target="_blank" rel="noreferrer">
             Privacy & data sources
           </a>

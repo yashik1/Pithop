@@ -90,6 +90,22 @@ open-data, commercial use allowed, one key for everything.
 3. Set it as `VITE_GEOAPIFY_API_KEY` in Vercel (Project → Settings →
    Environment Variables) and redeploy. No key = hobby mode, automatically.
 
+## Affiliate links (optional)
+
+Monetization is env-driven and off by default — each button appears only when
+its partner ID is configured, and a disclosure line shows in the footer
+whenever any partner is active:
+
+| Env var | Partner | Where it shows |
+| --- | --- | --- |
+| `VITE_VIATOR_PID` | [Viator partner program](https://partner.viator.com/) (`pid`, e.g. `P00123456`) | "🎟️ Book tickets" on attraction/museum/zoo/theme-park stops |
+| `VITE_GYG_PARTNER_ID` | [GetYourGuide partners](https://partner.getyourguide.com/) — used if no Viator pid | same |
+| `VITE_BOOKING_AID` | [Booking.com affiliate program](https://www.booking.com/affiliate-program/v2/index.html) (`aid` number) | "🏨 Hotels in {destination}" on the route summary |
+| `VITE_UPSIDE_REF_URL` | [Upside](https://www.getupside.com/) personal referral link (`https://upside.app.link/…`) | "⛽ Gas cash back" on rest stops |
+
+All affiliate anchors carry `rel="sponsored"`, and `public/privacy.html`
+contains the full disclosure.
+
 ## Deploying (Vercel)
 
 1. [vercel.com/new](https://vercel.com/new) → Import the GitHub repo
