@@ -1,7 +1,7 @@
 // Stale-while-revalidate for the app shell so SideQuest opens instantly (and
 // offline, minus live data) when installed as a PWA. API and cross-origin
 // requests (tiles, data services) are never cached here.
-const CACHE = 'sidequest-v1';
+const CACHE = 'sidequest-v2';
 
 self.addEventListener('install', () => {
   self.skipWaiting();
