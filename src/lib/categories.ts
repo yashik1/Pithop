@@ -45,6 +45,10 @@ const VISIT_MINUTES: Record<string, number> = {
   beach: 90,
   rest_area: 15,
   services: 20,
+  fuel: 10,
+  toilets: 10,
+  truck_stop: 20,
+  charging_station: 30,
 };
 
 export function visitMinutes(kind: string): number {

@@ -21,6 +21,11 @@ export async function hasGoogleBackend(): Promise<boolean> {
 
 const TYPE_TO_CATEGORY: Array<{ types: string[]; category: CategoryId; kind: string }> = [
   { types: ['observation_deck'], category: 'views', kind: 'viewpoint' },
+  { types: ['gas_station'], category: 'rest', kind: 'fuel' },
+  { types: ['rest_stop'], category: 'rest', kind: 'rest_area' },
+  { types: ['truck_stop'], category: 'rest', kind: 'truck_stop' },
+  { types: ['electric_vehicle_charging_station'], category: 'rest', kind: 'charging_station' },
+  { types: ['public_bathroom'], category: 'rest', kind: 'toilets' },
   {
     types: ['restaurant', 'cafe', 'coffee_shop', 'bakery', 'ice_cream_shop', 'fast_food_restaurant', 'bar'],
     category: 'food',

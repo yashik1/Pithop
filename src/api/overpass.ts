@@ -26,6 +26,8 @@ function buildQuery(samples: LatLng[]): string {
     body += `node["amenity"~"^(restaurant|cafe|fast_food|ice_cream)$"]["name"](around:3000,${pt});`;
     body += `node["highway"~"^(rest_area|services)$"](around:8000,${pt});`;
     body += `way["highway"~"^(rest_area|services)$"](around:8000,${pt});`;
+    body += `node["amenity"~"^(fuel|toilets)$"](around:3000,${pt});`;
+    body += `way["amenity"="fuel"](around:3000,${pt});`;
   }
   return `[out:json][timeout:30];(${body});out center qt 1200;`;
 }
@@ -71,6 +73,12 @@ function categorizeOsm(tags: Record<string, string>): { category: CategoryId; ki
       kind: tags.highway,
       name: tags.name ?? (tags.highway === 'services' ? 'Service area' : 'Rest area'),
     };
+  }
+  if (tags.amenity === 'fuel') {
+    return { category: 'rest', kind: 'fuel', name: tags.name ?? tags.brand ?? 'Fuel station' };
+  }
+  if (tags.amenity === 'toilets') {
+    return { category: 'rest', kind: 'toilets', name: tags.name ?? 'Public restrooms' };
   }
   return null;
 }

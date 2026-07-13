@@ -5,6 +5,7 @@ const DEFAULT_QUERIES = [
   'tourist attractions and roadside attractions',
   'highly rated restaurants and cafes',
   'parks and scenic viewpoints',
+  'gas stations and highway rest areas with restrooms',
 ];
 
 const FIELD_MASK =
