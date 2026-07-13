@@ -10,15 +10,20 @@ interface PhotonFeature {
   geometry: { coordinates: [number, number] };
   properties: {
     name?: string;
+    housenumber?: string;
+    street?: string;
     city?: string;
     state?: string;
     country?: string;
   };
 }
 
+// Street addresses come back as housenumber/street with no name — join them
+// so "782 Bethany Crescent" shows instead of collapsing to just the city.
 function toLabel(f: PhotonFeature): string {
   const p = f.properties;
-  const parts = [p.name, p.city, p.state, p.country].filter(Boolean) as string[];
+  const street = [p.housenumber, p.street].filter(Boolean).join(' ');
+  const parts = [p.name, street, p.city, p.state, p.country].filter(Boolean) as string[];
   return [...new Set(parts)].join(', ');
 }
 
