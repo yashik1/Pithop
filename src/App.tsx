@@ -15,6 +15,7 @@ import {
   loadCurrentTrip,
   saveCurrentTrip,
   saveTripToLibrary,
+  updateSavedTrip,
   type StoredTrip,
   type TripData,
 } from './lib/tripStore';
@@ -94,6 +95,9 @@ export default function App() {
   // Bumped on every new search so a slow response from an old search can't
   // overwrite the results of a newer one.
   const searchSeq = useRef(0);
+  // Library entry the active trip belongs to (saved or loaded from it) —
+  // edits live-sync to that entry. A fresh search detaches until re-saved.
+  const activeLibraryIdRef = useRef<string | null>(null);
 
   // Make a stored trip the active one: route, stops, plan, map refs.
   function applyTrip(t: TripData) {
@@ -135,10 +139,16 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Keep the auto-saved current trip fresh (plan edits included).
+  // Keep the auto-saved current trip fresh (plan edits included), and
+  // live-sync the library entry this trip belongs to, if any.
   useEffect(() => {
     const t = buildTripData();
-    if (t) saveCurrentTrip(t);
+    if (!t) return;
+    saveCurrentTrip(t);
+    if (activeLibraryIdRef.current) {
+      updateSavedTrip(activeLibraryIdRef.current, t);
+      setSavedTrips(listSavedTrips());
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [route, stops, planIds, routeLabel]);
 
@@ -146,12 +156,15 @@ export default function App() {
     const t = buildTripData();
     if (!t) return;
     const err = saveTripToLibrary(t);
-    setSavedTrips(listSavedTrips());
-    setNotice(err ?? '💾 Trip saved — you can reopen it from the start screen (works offline too).');
+    const list = listSavedTrips();
+    setSavedTrips(list);
+    if (!err) activeLibraryIdRef.current = list.find((s) => s.routeLabel === t.routeLabel)?.id ?? null;
+    setNotice(err ?? '💾 Trip saved — it keeps updating as you edit, and you can reopen it from the start screen.');
   }
 
   function handleLoadTrip(t: StoredTrip) {
     searchSeq.current++; // invalidates any in-flight search
+    activeLibraryIdRef.current = t.id;
     setBusy(null);
     setError(null);
     setNotice(null);
@@ -160,12 +173,14 @@ export default function App() {
 
   function handleDeleteTrip(t: StoredTrip) {
     if (!window.confirm(`Delete saved trip "${t.routeLabel}"?`)) return;
+    if (activeLibraryIdRef.current === t.id) activeLibraryIdRef.current = null;
     setSavedTrips(deleteSavedTrip(t.id));
   }
 
   async function findStops() {
     const token = ++searchSeq.current;
     const fresh = () => searchSeq.current === token;
+    activeLibraryIdRef.current = null; // a fresh search is a new, unsaved trip
     setBusy('Locating places…');
     setError(null);
     setNotice(null);
@@ -279,6 +294,7 @@ export default function App() {
     setFromPick(null);
     setToPick(null);
     routeCalcRef.current = null;
+    activeLibraryIdRef.current = null;
     clearCurrentTrip();
   }
 
@@ -633,7 +649,7 @@ export default function App() {
                 <button type="button" className="trip-load" onClick={() => handleLoadTrip(t)}>
                   <span className="trip-name">{t.routeLabel}</span>
                   <span className="trip-meta">
-                    {t.stops.length} stops · {t.planIds.length} in plan · saved{' '}
+                    {t.stops.length} stops · {t.planIds.length} in plan · updated{' '}
                     {new Date(t.savedAt).toLocaleDateString()}
                   </span>
                 </button>

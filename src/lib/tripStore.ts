@@ -93,6 +93,15 @@ export function saveTripToLibrary(trip: TripData): string | null {
   return writeLibrary(list) ? null : 'Saving failed — device storage looks full.';
 }
 
+// Live-sync: refresh an existing entry in place (no-op if it was deleted).
+export function updateSavedTrip(id: string, trip: TripData): void {
+  const list = listSavedTrips();
+  const i = list.findIndex((t) => t.id === id);
+  if (i < 0) return;
+  list[i] = { ...list[i], ...trip, savedAt: Date.now() };
+  writeLibrary(list);
+}
+
 export function deleteSavedTrip(id: string): StoredTrip[] {
   const list = listSavedTrips().filter((t) => t.id !== id);
   writeLibrary(list);
