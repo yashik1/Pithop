@@ -204,14 +204,48 @@ body {
 
 .brand {
   position: relative;
-  padding: 22px 64px 10px 20px;
+  padding: 22px 136px 10px 20px;
   color: #fff;
 }
 
-.theme-btn {
+.head-tools {
   position: absolute;
   top: 22px;
   right: 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.units-toggle {
+  display: inline-flex;
+  padding: 3px;
+  background: rgba(255, 255, 255, 0.16);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 11px;
+}
+
+.units-toggle button {
+  min-width: 30px;
+  height: 30px;
+  padding: 0 8px;
+  border: none;
+  border-radius: 8px;
+  background: none;
+  color: rgba(255, 255, 255, 0.75);
+  font-family: inherit;
+  font-size: 12.5px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.15s var(--ease-out), color 0.15s var(--ease-out);
+}
+
+.units-toggle button.active {
+  background: #fff;
+  color: var(--primary-deep);
+}
+
+.theme-btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -755,6 +789,13 @@ body {
 
 .plan-name {
   flex: 1;
+  min-width: 0;
+  text-align: left;
+  border: none;
+  background: none;
+  padding: 0;
+  font-family: inherit;
+  font-size: 13px;
   cursor: pointer;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -765,6 +806,55 @@ body {
 }
 
 .plan-name:hover {
+  color: var(--primary-deep);
+}
+
+/* Navigate + share CTAs under the plan. */
+.plan-cta {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.plan-nav {
+  flex: 1;
+  min-height: 42px;
+  border: none;
+  border-radius: 10px;
+  background: var(--grad-cta);
+  color: #fff;
+  font-family: inherit;
+  font-size: 13.5px;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 3px 10px rgba(37, 99, 235, 0.3);
+  transition: filter 0.15s var(--ease-out), transform 0.12s var(--ease-out);
+}
+
+.plan-nav:hover {
+  filter: brightness(1.08);
+}
+
+.plan-nav:active {
+  transform: scale(0.98);
+}
+
+.plan-share {
+  min-height: 42px;
+  padding: 0 14px;
+  border: 1.5px solid var(--line-strong);
+  border-radius: 10px;
+  background: var(--card);
+  color: var(--ink-2);
+  font-family: inherit;
+  font-size: 13.5px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: border-color 0.15s var(--ease-out), color 0.15s var(--ease-out);
+}
+
+.plan-share:hover {
+  border-color: var(--primary);
   color: var(--primary-deep);
 }
 
@@ -886,6 +976,11 @@ body {
 
 .stop-card:active {
   transform: scale(0.985);
+}
+
+.stop-card:focus-visible {
+  outline: 3px solid rgba(37, 99, 235, 0.55);
+  outline-offset: 2px;
 }
 
 .stop-card.selected {
