@@ -38,8 +38,41 @@ const PARKING_LABEL: Record<'free' | 'paid' | 'none', string> = {
   paid: 'Paid parking',
   none: 'No parking on site',
 };
+
+// Decode a shared trip from location.hash (#trip=<base64>). Returns the route
+// endpoints (as text) and the planned stops, or null if there's no valid share.
+function parseShareHash(): { fromText: string; toText: string; plan: Stop[] } | null {
+  const m = /[#&]trip=([^&]+)/.exec(location.hash);
+  if (!m) return null;
+  try {
+    const data = JSON.parse(decodeURIComponent(atob(m[1])));
+    if (!data.f || !data.t || !Array.isArray(data.p)) return null;
+    const known = new Set(CATEGORIES.map((c) => c.id));
+    const plan: Stop[] = data.p
+      .filter((p: any) => Number.isFinite(Number(p.a)) && Number.isFinite(Number(p.o)))
+      .map((p: any, i: number) => ({
+      id: `share/${i}`,
+      name: String(p.n ?? 'Stop').slice(0, 120),
+      lat: Number(p.a),
+      lng: Number(p.o),
+      category: (known.has(p.c) ? p.c : 'fun') as CategoryId,
+      kind: p.k ?? 'community',
+      visitMin: Number(p.v) || 30,
+      source: 'community' as const,
+      description: p.d || undefined,
+      parking: p.pk,
+      offRouteKm: 0,
+      alongKm: 0,
+      detourMin: 0,
+    }));
+    return { fromText: String(data.f), toText: String(data.t), plan };
+  } catch {
+    return null;
+  }
+}
 import { cumulativeKm, haversineKm, projectOntoRoute, sampleAlong, simplify, type LatLng } from './lib/geo';
-import { fmtDur } from './lib/format';
+import { distValue, fmtDist, fmtDur, type Units } from './lib/format';
+import { getUnits, setUnits } from './lib/units';
 import { MapView } from './MapView';
 import { PlaceInput } from './components/PlaceInput';
 
@@ -101,6 +134,7 @@ export default function App() {
   const [aheadOnly, setAheadOnly] = useState(false);
   const [myAlongKm, setMyAlongKm] = useState<number | null>(null);
   const [themeMode, setThemeModeState] = useState<ThemeMode>(getThemeMode);
+  const [units, setUnitsState] = useState<Units>(getUnits);
   const [savedTrips, setSavedTrips] = useState<StoredTrip[]>(listSavedTrips);
   // Community places: shared with all users via the optional backend.
   const [communityOn, setCommunityOn] = useState(false);
@@ -121,6 +155,10 @@ export default function App() {
   // Library entry the active trip belongs to (saved or loaded from it) —
   // edits live-sync to that entry. A fresh search detaches until re-saved.
   const activeLibraryIdRef = useRef<string | null>(null);
+  // Planned stops from an opened share link, applied once the search rebuilds
+  // the route and full stop list.
+  const sharedPlanRef = useRef<Stop[] | null>(null);
+  const [sharePending, setSharePending] = useState(false);
 
   // Make a stored trip the active one: route, stops, plan, map refs.
   function applyTrip(t: TripData) {
@@ -157,15 +195,53 @@ export default function App() {
     void hasCommunity().then(setCommunityOn);
   }, []);
 
-  // Restore the last planned trip on startup — works fully offline since
-  // everything needed (route, stops, plan) comes from localStorage.
+  // On startup: an opened share link wins over the auto-saved trip. It carries
+  // the endpoints and planned stops; we re-run the search to rebuild the route
+  // and full results, then re-apply the shared plan (see the effect below).
   useEffect(() => {
+    const shared = parseShareHash();
+    if (shared) {
+      history.replaceState(null, '', location.pathname + location.search); // drop the long hash
+      sharedPlanRef.current = shared.plan;
+      setSharePending(true);
+      setFromText(shared.fromText);
+      setToText(shared.toText);
+      setFromPick(null);
+      setToPick(null);
+      setNotice('Opening a shared trip — finding stops along the route…');
+      void findStops(shared.fromText, shared.toText);
+      return;
+    }
     const saved = loadCurrentTrip();
     if (!saved) return;
     applyTrip(saved);
     if (!navigator.onLine) setNotice('You are offline — showing your saved trip.');
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Once a shared trip's search has populated stops, restore its plan: match
+  // shared stops to the rebuilt results by id/coordinates, and append any that
+  // aren't found (e.g. community places) so the plan is exactly as shared.
+  useEffect(() => {
+    if (!sharePending || stops.length === 0) return;
+    const shared = sharedPlanRef.current ?? [];
+    const ids = new Set<string>();
+    const extras: Stop[] = [];
+    for (const sp of shared) {
+      const match = stops.find(
+        (s) => s.id === sp.id || (Math.abs(s.lat - sp.lat) < 6e-4 && Math.abs(s.lng - sp.lng) < 6e-4),
+      );
+      if (match) ids.add(match.id);
+      else extras.push(enrichWithRoute(sp));
+    }
+    if (extras.length) setStops((prev) => [...prev, ...extras].sort((a, b) => a.alongKm - b.alongKm));
+    for (const e of extras) ids.add(e.id);
+    setPlanIds(ids);
+    setSharePending(false);
+    sharedPlanRef.current = null;
+    setNotice(`Opened a shared trip with ${ids.size} stop${ids.size === 1 ? '' : 's'}. Add more or start driving!`);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stops, sharePending]);
 
   // Keep the auto-saved current trip fresh (plan edits included), and
   // live-sync the library entry this trip belongs to, if any.
@@ -264,7 +340,74 @@ export default function App() {
     setNotice('🚩 Reported — thank you. Places with several reports are hidden for everyone.');
   }
 
-  async function findStops() {
+  // Open the whole trip (origin → planned stops → destination) as one
+  // multi-stop driving route in Google Maps. Google's consumer URL takes up
+  // to ~9 waypoints; extra stops are dropped from navigation (still in the plan).
+  function navigateTrip() {
+    if (!route || plan.length === 0) return;
+    const origin = route.coords[0];
+    const dest = route.coords[route.coords.length - 1];
+    const waypoints = plan.slice(0, 9).map((s) => `${s.lat},${s.lng}`);
+    const url =
+      `https://www.google.com/maps/dir/?api=1&travelmode=driving` +
+      `&origin=${origin.lat},${origin.lng}&destination=${dest.lat},${dest.lng}` +
+      `&waypoints=${encodeURIComponent(waypoints.join('|'))}`;
+    window.open(url, '_blank', 'noopener');
+    if (plan.length > 9) {
+      setNotice('Opened your first 9 stops in Google Maps — Google limits a shared route to 9 waypoints.');
+    }
+  }
+
+  // Build a shareable link that carries the route endpoints and the planned
+  // stops (compact) in the URL hash, so a friend can reopen the trip.
+  function buildShareUrl(): string | null {
+    if (!route || plan.length === 0) return null;
+    const payload = {
+      f: fromText,
+      t: toText,
+      p: plan.map((s) => ({
+        n: s.name,
+        a: Number(s.lat.toFixed(5)),
+        o: Number(s.lng.toFixed(5)),
+        c: s.category,
+        k: s.kind,
+        v: s.visitMin,
+        d: s.description,
+        pk: s.parking,
+      })),
+    };
+    const encoded = btoa(encodeURIComponent(JSON.stringify(payload)));
+    return `${location.origin}${location.pathname}#trip=${encoded}`;
+  }
+
+  async function shareTrip() {
+    const url = buildShareUrl();
+    if (!url) return;
+    const shareData = { title: 'SideQuest road trip', text: `My road trip: ${routeLabel}`, url };
+    try {
+      if (navigator.share) {
+        await navigator.share(shareData);
+        return;
+      }
+    } catch {
+      // User cancelled the share sheet, or it failed — fall back to copy.
+    }
+    try {
+      await navigator.clipboard.writeText(url);
+      setNotice('🔗 Trip link copied — paste it to share or open on another device.');
+    } catch {
+      // Clipboard blocked — show the raw link so it can be copied by hand.
+      setNotice(`🔗 Share this link: ${url}`);
+    }
+  }
+
+  // Overrides let callers (e.g. opening a shared link) pass endpoints directly
+  // instead of relying on React state that hasn't flushed yet.
+  async function findStops(overrideFrom?: string, overrideTo?: string) {
+    const fText = overrideFrom ?? fromText;
+    const tText = overrideTo ?? toText;
+    const fPick = overrideFrom ? null : fromPick;
+    const tPick = overrideTo ? null : toPick;
     const token = ++searchSeq.current;
     const fresh = () => searchSeq.current === token;
     activeLibraryIdRef.current = null; // a fresh search is a new, unsaved trip
@@ -278,8 +421,8 @@ export default function App() {
     setMyAlongKm(null);
     try {
       const [from, to] = await Promise.all([
-        fromPick ? Promise.resolve({ ...fromPick, displayName: fromText }) : geocode(fromText),
-        toPick ? Promise.resolve({ ...toPick, displayName: toText }) : geocode(toText),
+        fPick ? Promise.resolve({ ...fPick, displayName: fText }) : geocode(fText),
+        tPick ? Promise.resolve({ ...tPick, displayName: tText }) : geocode(tText),
       ]);
       if (!fresh()) return;
       setBusy('Calculating route…');
@@ -495,19 +638,37 @@ export default function App() {
             <h1>
               <span className="brand-icon">🛣️</span> <span className="brand-name">SideQuest</span>
             </h1>
-            <button
-              type="button"
-              className="theme-btn"
-              title={`Theme: ${THEME_LABELS[themeMode].label} — click to change`}
-              aria-label={`Theme: ${THEME_LABELS[themeMode].label} — click to change`}
-              onClick={() => {
-                const next = THEME_CYCLE[themeMode];
-                setThemeModeState(next);
-                setThemeMode(next);
-              }}
-            >
-              {THEME_LABELS[themeMode].icon}
-            </button>
+            <div className="head-tools">
+              <div className="units-toggle" role="group" aria-label="Distance units">
+                {(['km', 'mi'] as Units[]).map((u) => (
+                  <button
+                    key={u}
+                    type="button"
+                    className={units === u ? 'active' : ''}
+                    aria-pressed={units === u}
+                    onClick={() => {
+                      setUnitsState(u);
+                      setUnits(u);
+                    }}
+                  >
+                    {u}
+                  </button>
+                ))}
+              </div>
+              <button
+                type="button"
+                className="theme-btn"
+                title={`Theme: ${THEME_LABELS[themeMode].label} — click to change`}
+                aria-label={`Theme: ${THEME_LABELS[themeMode].label} — click to change`}
+                onClick={() => {
+                  const next = THEME_CYCLE[themeMode];
+                  setThemeModeState(next);
+                  setThemeMode(next);
+                }}
+              >
+                {THEME_LABELS[themeMode].icon}
+              </button>
+            </div>
             <p>Fun stops, hidden gems and breaks along your drive</p>
           </header>
 
@@ -631,7 +792,7 @@ export default function App() {
             </div>
             <div className="summary-route">{routeLabel}</div>
             <div className="summary-stats">
-              {Math.round(route.distanceKm)} km · {fmtDur(route.durationMin)} drive · {stops.length} stops found
+              {fmtDist(route.distanceKm, units)} · {fmtDur(route.durationMin)} drive · {stops.length} stops found
             </div>
             {(() => {
               const dest = routeLabel.split('→')[1]?.trim();
@@ -651,9 +812,9 @@ export default function App() {
             {stops.length > 0 && (
               <label className="ahead">
                 <input type="checkbox" checked={aheadOnly} onChange={toggleAhead} />
-                On the road: only stops ahead of me (next 80 km)
+                On the road: only stops ahead of me (next {units === 'mi' ? '50 mi' : '80 km'})
                 {aheadOnly && myAlongKm !== null && (
-                  <span className="ahead-pos"> — you're at km {Math.round(myAlongKm)}</span>
+                  <span className="ahead-pos"> — you're at {fmtDist(myAlongKm, units)}</span>
                 )}
               </label>
             )}
@@ -672,6 +833,8 @@ export default function App() {
                       type="button"
                       className={`chip${active ? ' active' : ''}`}
                       style={active ? { background: c.color, borderColor: c.color } : undefined}
+                      aria-pressed={active}
+                      aria-label={`${c.label} filter, ${catCounts[c.id] ?? 0} stops`}
                       onClick={() => toggleCat(c.id)}
                     >
                       {c.emoji} {c.label}
@@ -709,15 +872,28 @@ export default function App() {
                 <h2>Your stops ({plan.length})</h2>
                 {plan.map((s) => (
                   <div key={s.id} className="plan-item">
-                    <span className="plan-name" onClick={() => setSelectedId(s.id)}>
+                    <button type="button" className="plan-name" onClick={() => setSelectedId(s.id)}>
                       {CATEGORY_MAP[s.category].emoji} {s.name}
-                    </span>
+                    </button>
                     <span className="plan-time">{fmtDur(s.visitMin)}</span>
-                    <button type="button" className="plan-remove" onClick={() => togglePlan(s.id)}>
+                    <button
+                      type="button"
+                      className="plan-remove"
+                      aria-label={`Remove ${s.name} from your trip`}
+                      onClick={() => togglePlan(s.id)}
+                    >
                       ✕
                     </button>
                   </div>
                 ))}
+                <div className="plan-cta">
+                  <button type="button" className="plan-nav" onClick={navigateTrip}>
+                    🧭 Start trip in Google Maps
+                  </button>
+                  <button type="button" className="plan-share" onClick={() => void shareTrip()}>
+                    🔗 Share
+                  </button>
+                </div>
               </div>
             )}
 
@@ -735,7 +911,17 @@ export default function App() {
                   <div
                     key={s.id}
                     className={`stop-card${selected ? ' selected' : ''}`}
+                    role="button"
+                    tabIndex={0}
+                    aria-expanded={selected}
+                    aria-label={`${s.name}, ${c.label}`}
                     onClick={() => setSelectedId(s.id)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        setSelectedId(s.id);
+                      }
+                    }}
                   >
                     <div className="stop-icon" style={{ background: c.color + '26' }}>
                       {c.emoji}
@@ -744,7 +930,8 @@ export default function App() {
                       <div className="stop-name">{s.name}</div>
                       <div className="stop-meta">
                         {s.source === 'community' ? '👥 Traveller tip · ' : ''}
-                        {c.label} · ⏱ {fmtDur(s.visitMin)} · 🚗 {s.detourMin} min detour · km {Math.round(s.alongKm)}
+                        {c.label} · ⏱ {fmtDur(s.visitMin)} · 🚗 {s.detourMin} min detour · at{' '}
+                        {distValue(s.alongKm, units)} {units}
                       </div>
                       {s.description && <div className="stop-desc">{s.description}</div>}
                       {selected && (
@@ -791,6 +978,8 @@ export default function App() {
                       type="button"
                       className={`add-btn${added ? ' added' : ''}`}
                       title={added ? 'Remove from trip' : 'Add to trip'}
+                      aria-label={added ? `Remove ${s.name} from trip` : `Add ${s.name} to trip`}
+                      aria-pressed={added}
                       onClick={(e) => {
                         e.stopPropagation();
                         togglePlan(s.id);
