@@ -8,7 +8,7 @@ export interface Stop {
   category: CategoryId;
   kind: string;
   visitMin: number;
-  source: 'wiki' | 'osm' | 'geoapify';
+  source: 'wiki' | 'osm' | 'geoapify' | 'community';
   description?: string;
   imageUrl?: string;
   wikiUrl?: string;

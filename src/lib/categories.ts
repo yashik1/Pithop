@@ -49,6 +49,7 @@ const VISIT_MINUTES: Record<string, number> = {
   toilets: 10,
   truck_stop: 20,
   charging_station: 30,
+  community: 30,
 };
 
 export function visitMinutes(kind: string): number {
@@ -84,6 +85,7 @@ const THINGS_TO_DO: Record<string, string> = {
   toilets: 'Public restrooms for a quick pit stop.',
   truck_stop: 'Fuel, hot food, showers and plenty of parking.',
   charging_station: 'Charge the car and take a breather while you wait.',
+  community: 'A traveller-recommended spot — their note says what makes it special.',
 };
 
 export function thingsToDo(kind: string): string {

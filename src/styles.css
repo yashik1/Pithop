@@ -1686,3 +1686,194 @@ body {
 :root[data-theme='dark'] .leaflet-container {
   background: #0b1322;
 }
+
+/* ---------- Community places ---------- */
+
+/* The map div now wraps a canvas plus overlay controls. */
+.map-canvas {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+}
+
+.map-add {
+  position: absolute;
+  right: 12px;
+  bottom: 28px;
+  z-index: 10;
+  min-height: 42px;
+  padding: 10px 16px;
+  border: none;
+  border-radius: 999px;
+  background: var(--grad-cta);
+  color: #fff;
+  font-family: inherit;
+  font-size: 13.5px;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 6px 18px rgba(37, 99, 235, 0.45);
+  transition: filter 0.15s var(--ease-out), transform 0.12s var(--ease-out);
+}
+
+.map-add:hover {
+  filter: brightness(1.1);
+}
+
+.map-add:active {
+  transform: scale(0.96);
+}
+
+.map-add.armed {
+  background: #101d33;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.4);
+}
+
+.add-place {
+  margin: 12px 14px 0;
+  padding: 14px 16px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-1);
+  animation: rise-in 0.3s var(--ease-out) backwards;
+}
+
+.add-place h2 {
+  margin: 0 0 2px;
+  font-size: 14.5px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+}
+
+.add-coords {
+  margin: 0 0 10px;
+  font-size: 12px;
+  color: var(--ink-3);
+}
+
+.add-place input,
+.add-place textarea,
+.add-place select {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1.5px solid var(--line-strong);
+  border-radius: 10px;
+  font-family: inherit;
+  font-size: 13.5px;
+  color: var(--ink);
+  background: var(--card);
+}
+
+.add-place input:focus,
+.add-place textarea:focus,
+.add-place select:focus {
+  outline: none;
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.18);
+}
+
+.add-place textarea {
+  margin-top: 8px;
+  min-height: 64px;
+  resize: vertical;
+}
+
+.add-row {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.add-row select {
+  flex: 1;
+  min-width: 0;
+}
+
+.add-error {
+  margin-top: 8px;
+  font-size: 12.5px;
+  color: #a02121;
+}
+
+.add-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.add-share {
+  flex: 1;
+  min-height: 40px;
+  border: none;
+  border-radius: 10px;
+  background: var(--grad-cta);
+  color: #fff;
+  font-family: inherit;
+  font-size: 13.5px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: filter 0.15s var(--ease-out);
+}
+
+.add-share:hover:not(:disabled) {
+  filter: brightness(1.1);
+}
+
+.add-share:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.add-cancel {
+  min-height: 40px;
+  padding: 0 14px;
+  border: 1.5px solid var(--line-strong);
+  border-radius: 10px;
+  background: none;
+  color: var(--ink-2);
+  font-family: inherit;
+  font-size: 13.5px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.add-fine {
+  margin: 8px 0 0;
+  font-size: 11px;
+  color: var(--ink-3);
+}
+
+.report-btn {
+  border: none;
+  background: none;
+  padding: 0;
+  color: var(--ink-3);
+  font-family: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.report-btn:hover {
+  color: #d64545;
+  text-decoration: underline;
+}
+
+.map-popup .p-community {
+  display: inline-block;
+  margin-bottom: 4px;
+  padding: 2px 8px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #7c3aed;
+  background: rgba(124, 58, 237, 0.12);
+  border-radius: 999px;
+}
+
+:root[data-theme='dark'] .map-popup .p-community {
+  color: #c4b5fd;
+}
+
+:root[data-theme='dark'] .add-error {
+  color: #f3a6a6;
+}

@@ -4,6 +4,12 @@ import { fetchRoute, type RouteResult } from './api/route';
 import { fetchRoadsideStops } from './api/overpass';
 import { fetchWikiExtract, fetchWikiStops } from './api/wikipedia';
 import { fetchGeoapifyRoadside, hasGeoapify } from './api/geoapify';
+import {
+  fetchCommunityStops,
+  hasCommunity,
+  reportCommunityStop,
+  submitCommunityStop,
+} from './api/community';
 import type { Stop } from './types';
 import { CATEGORIES, CATEGORY_MAP, thingsToDo, type CategoryId } from './lib/categories';
 import { anyAffiliate, gasCashbackLink, hotelsLink, ticketsLink } from './lib/affiliates';
@@ -90,6 +96,16 @@ export default function App() {
   const [myAlongKm, setMyAlongKm] = useState<number | null>(null);
   const [themeMode, setThemeModeState] = useState<ThemeMode>(getThemeMode);
   const [savedTrips, setSavedTrips] = useState<StoredTrip[]>(listSavedTrips);
+  // Community places: shared with all users via the optional backend.
+  const [communityOn, setCommunityOn] = useState(false);
+  const [addArmed, setAddArmed] = useState(false);
+  const [addPin, setAddPin] = useState<LatLng | null>(null);
+  const [addName, setAddName] = useState('');
+  const [addNote, setAddNote] = useState('');
+  const [addCategory, setAddCategory] = useState<CategoryId>('fun');
+  const [addVisit, setAddVisit] = useState(30);
+  const [addBusy, setAddBusy] = useState(false);
+  const [addError, setAddError] = useState<string | null>(null);
   const routeCalcRef = useRef<{ calcRoute: LatLng[]; cum: number[] } | null>(null);
 
   // Bumped on every new search so a slow response from an old search can't
@@ -128,6 +144,11 @@ export default function App() {
           planIds: [...planIds],
         }
       : null;
+
+  // Show the community "Add a place" feature only when the backend exists.
+  useEffect(() => {
+    void hasCommunity().then(setCommunityOn);
+  }, []);
 
   // Restore the last planned trip on startup — works fully offline since
   // everything needed (route, stops, plan) comes from localStorage.
@@ -175,6 +196,63 @@ export default function App() {
     if (!window.confirm(`Delete saved trip "${t.routeLabel}"?`)) return;
     if (activeLibraryIdRef.current === t.id) activeLibraryIdRef.current = null;
     setSavedTrips(deleteSavedTrip(t.id));
+  }
+
+  // Enrich a single stop against the active route (no-op when no route).
+  function enrichWithRoute(s: Stop): Stop {
+    const calc = routeCalcRef.current;
+    if (!calc) return s;
+    const proj = projectOntoRoute({ lat: s.lat, lng: s.lng }, calc.calcRoute, calc.cum);
+    return {
+      ...s,
+      offRouteKm: proj.offRouteKm,
+      alongKm: proj.alongKm,
+      detourMin: Math.round((proj.offRouteKm * 2 * 60) / 40) + 2,
+    };
+  }
+
+  function pickAddPoint(p: LatLng) {
+    setAddPin(p);
+    setAddArmed(false);
+    setAddName('');
+    setAddNote('');
+    setAddCategory('fun');
+    setAddVisit(30);
+    setAddError(null);
+  }
+
+  async function shareAddPlace() {
+    if (!addPin || !addName.trim() || addBusy) return;
+    setAddBusy(true);
+    setAddError(null);
+    try {
+      const stop = await submitCommunityStop({
+        name: addName.trim(),
+        note: addNote.trim(),
+        category: addCategory,
+        visitMin: addVisit,
+        lat: addPin.lat,
+        lng: addPin.lng,
+      });
+      setAddPin(null);
+      if (route) {
+        const enriched = enrichWithRoute(stop);
+        setStops((prev) => [...prev, enriched].sort((a, b) => a.alongKm - b.alongKm));
+        setSelectedId(stop.id);
+        setNotice('👥 Thanks — your place is now visible to all travellers.');
+      } else {
+        setNotice('👥 Thanks — your place will appear on any route passing nearby.');
+      }
+    } catch (e) {
+      setAddError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setAddBusy(false);
+    }
+  }
+
+  async function handleReport(s: Stop) {
+    await reportCommunityStop(s.id).catch(() => {});
+    setNotice('🚩 Reported — thank you. Places with several reports are hidden for everyone.');
   }
 
   async function findStops() {
@@ -228,6 +306,8 @@ export default function App() {
       // slow — show Wikipedia landmarks as soon as they're ready and merge
       // the roadside stops in whenever they arrive.
       const roadsidePromise = hasGeoapify() ? fetchGeoapifyRoadside(samples) : fetchRoadsideStops(samples);
+      // Traveller-shared places along the corridor — best-effort, silent on failure.
+      const communityPromise = fetchCommunityStops(samples).catch(() => [] as Stop[]);
       let wikiStops: Stop[] = [];
       let wikiError = false;
       // Paint each round of Wikipedia results as it lands — the first stops
@@ -253,14 +333,17 @@ export default function App() {
         setNotice('Adding food, viewpoint and rest-stop data…');
       }
 
-      const [roadsideSettled] = await Promise.allSettled([roadsidePromise]);
+      const [roadsideSettled, communityStops] = await Promise.all([
+        Promise.allSettled([roadsidePromise]).then(([r]) => r),
+        communityPromise,
+      ]);
       if (!fresh()) return;
       const roadsideStops = roadsideSettled.status === 'fulfilled' ? enrich(roadsideSettled.value) : [];
       const roadsideError = roadsideSettled.status === 'rejected';
       if (wikiError && roadsideError) {
         throw new Error('Both place services are unavailable right now — try again in a couple of minutes');
       }
-      setStops(mergeStops(wikiStops, roadsideStops));
+      setStops(mergeStops(mergeStops(wikiStops, roadsideStops), enrich(communityStops)));
       if (roadsideError) {
         setNotice('Live food & rest-stop data is busy right now — other sources are shown.');
       } else {
@@ -464,6 +547,59 @@ export default function App() {
         {error && <div className="error">⚠️ {error}</div>}
         {notice && !busy && <div className="notice">ℹ️ {notice}</div>}
 
+        {addPin && (
+          <div className="add-place">
+            <h2>📍 Share a place with all travellers</h2>
+            <p className="add-coords">
+              Pin at {addPin.lat.toFixed(4)}, {addPin.lng.toFixed(4)} — drag the map and tap "Add a place" again to
+              move it.
+            </p>
+            <input
+              className="add-name"
+              value={addName}
+              maxLength={60}
+              placeholder="Name — e.g. Riverside picnic spot"
+              onChange={(e) => setAddName(e.target.value)}
+            />
+            <div className="add-row">
+              <select value={addCategory} onChange={(e) => setAddCategory(e.target.value as CategoryId)}>
+                {CATEGORIES.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.emoji} {c.label}
+                  </option>
+                ))}
+              </select>
+              <select value={addVisit} onChange={(e) => setAddVisit(Number(e.target.value))}>
+                <option value={15}>~15 min stop</option>
+                <option value={30}>~30 min stop</option>
+                <option value={60}>~1 hour stop</option>
+                <option value={120}>~2 hour stop</option>
+              </select>
+            </div>
+            <textarea
+              value={addNote}
+              maxLength={200}
+              placeholder="What makes it worth the stop? (optional)"
+              onChange={(e) => setAddNote(e.target.value)}
+            />
+            {addError && <div className="add-error">⚠️ {addError}</div>}
+            <div className="add-actions">
+              <button
+                type="button"
+                className="add-share"
+                disabled={!addName.trim() || addBusy}
+                onClick={() => void shareAddPlace()}
+              >
+                {addBusy ? 'Sharing…' : 'Share with travellers'}
+              </button>
+              <button type="button" className="add-cancel" onClick={() => setAddPin(null)}>
+                Cancel
+              </button>
+            </div>
+            <p className="add-fine">Shared publicly with every user of this app — no account needed.</p>
+          </div>
+        )}
+
         {route && !busy && (
           <div className="summary">
             <div className="summary-actions">
@@ -588,6 +724,7 @@ export default function App() {
                     <div className="stop-body">
                       <div className="stop-name">{s.name}</div>
                       <div className="stop-meta">
+                        {s.source === 'community' ? '👥 Traveller tip · ' : ''}
                         {c.label} · ⏱ {fmtDur(s.visitMin)} · 🚗 {s.detourMin} min detour · km {Math.round(s.alongKm)}
                       </div>
                       {s.description && <div className="stop-desc">{s.description}</div>}
@@ -619,6 +756,11 @@ export default function App() {
                             >
                               Google Maps ↗
                             </a>
+                            {s.source === 'community' && (
+                              <button type="button" className="report-btn" onClick={() => void handleReport(s)}>
+                                🚩 Report
+                              </button>
+                            )}
                           </div>
                         </div>
                       )}
@@ -706,6 +848,14 @@ export default function App() {
         selectedId={selectedId}
         onSelect={setSelectedId}
         onTogglePlan={togglePlan}
+        communityOn={communityOn}
+        addArmed={addArmed}
+        onToggleAdd={() => {
+          setAddArmed((a) => !a);
+          setAddPin(null);
+        }}
+        onPickPoint={pickAddPoint}
+        pinPreview={addPin}
       />
     </div>
   );

@@ -94,6 +94,20 @@ open-data, commercial use allowed, one key for everything.
 3. Set it as `VITE_GEOAPIFY_API_KEY` in Vercel (Project → Settings →
    Environment Variables) and redeploy. No key = hobby mode, automatically.
 
+## Community places (optional backend)
+
+Travellers can share unlisted spots — a swimming hole, a local viewpoint —
+with **every user**: tap **📍 Add a place** on the map, drop a pin, name it,
+pick a category and add a note. Shared places appear automatically on any
+route passing within ~12 km, for everyone, and ride along in saved trips
+(so they work offline once found). Moderation is report-based: places
+reported by 3 users are hidden; submissions are rate-limited per IP.
+
+Setup: Vercel → **Marketplace → Upstash for Redis** (free tier) → attach to
+the project → redeploy. The two env vars are injected automatically
+(`UPSTASH_REDIS_REST_URL` / `UPSTASH_REDIS_REST_TOKEN`; the `KV_*` names also
+work). Without them the endpoint answers 503 and the app hides the feature.
+
 ## Affiliate links (optional)
 
 Monetization is env-driven and off by default — each button appears only when
