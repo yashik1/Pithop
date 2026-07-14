@@ -82,22 +82,26 @@ export async function geoapifyRoute(from: LatLng, to: LatLng): Promise<RouteResu
   };
 }
 
-// Roadside POIs (replaces Overpass): food, fuel, rest areas, viewpoints.
-// If the API rejects a category slug (400), retry with the safest subset so a
-// taxonomy change degrades coverage instead of killing the whole layer.
-const CATEGORIES_FULL =
-  'catering.restaurant,catering.cafe,catering.fast_food,catering.ice_cream,fuel,rest_area,tourism.attraction.viewpoint';
-const CATEGORIES_SAFE = 'catering,fuel';
+// Roadside POIs (replaces Overpass). These are Geoapify's documented category
+// slugs — invalid ones make the whole request 400, so the list is limited to
+// high-confidence categories. The request is tried category-by-category
+// (Promise.allSettled), so if one slug is ever rejected the others still
+// return, and coverage degrades gracefully instead of failing wholesale.
+// Kept to slugs we're confident are valid — one invalid slug 400s the whole
+// request. If even this is rejected, the fetch falls back to bare 'catering'.
+const ROADSIDE_CATEGORIES = 'catering.restaurant,catering.cafe,catering.fast_food,catering.ice_cream,service.vehicle.fuel,tourism.attraction';
+const ROADSIDE_FALLBACK = 'catering';
 
 function categorizeGeoapify(cats: string[]): { category: CategoryId; kind: string } | null {
   const has = (c: string) => cats.some((x) => x === c || x.startsWith(c + '.'));
-  if (has('tourism.attraction.viewpoint')) return { category: 'views', kind: 'viewpoint' };
-  if (has('rest_area')) return { category: 'rest', kind: 'rest_area' };
-  if (has('fuel')) return { category: 'rest', kind: 'fuel' };
+  if (has('service.vehicle.fuel')) return { category: 'rest', kind: 'fuel' };
+  if (has('service.vehicle.charging_station')) return { category: 'rest', kind: 'charging_station' };
+  if (cats.some((x) => x.includes('viewpoint'))) return { category: 'views', kind: 'viewpoint' };
   if (has('catering.fast_food')) return { category: 'food', kind: 'fast_food' };
   if (has('catering.ice_cream')) return { category: 'food', kind: 'ice_cream' };
   if (has('catering.cafe')) return { category: 'food', kind: 'cafe' };
   if (has('catering')) return { category: 'food', kind: 'restaurant' };
+  if (has('tourism')) return { category: 'fun', kind: 'attraction' };
   return null;
 }
 
@@ -112,12 +116,14 @@ export async function fetchGeoapifyRoadside(samples: LatLng[]): Promise<Stop[]> 
         `&filter=circle:${p.lng.toFixed(4)},${p.lat.toFixed(4)},${radiusM}&limit=100&apiKey=${KEY}`,
     );
 
-  let categories = CATEGORIES_FULL;
+  // Probe the first circle; if the category list is rejected (e.g. a slug is
+  // no longer valid), fall back to bare 'catering' before fanning out so at
+  // least food still appears.
+  let categories = ROADSIDE_CATEGORIES;
   try {
-    // Probe the first circle; on a category-taxonomy 400 fall back before fanning out.
     await fetchCircle(circles[0], categories);
   } catch {
-    categories = CATEGORIES_SAFE;
+    categories = ROADSIDE_FALLBACK;
   }
 
   const results = await Promise.allSettled(circles.map((p) => fetchCircle(p, categories)));

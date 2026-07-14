@@ -395,6 +395,21 @@ body {
   transform: scale(0.94);
 }
 
+.geo-btn.locating {
+  cursor: progress;
+  opacity: 0.85;
+}
+
+.geo-btn.locating {
+  animation: geo-pulse 1s ease-in-out infinite;
+}
+
+@keyframes geo-pulse {
+  50% {
+    opacity: 0.45;
+  }
+}
+
 .hero :focus-visible {
   outline-color: rgba(255, 255, 255, 0.9);
 }
