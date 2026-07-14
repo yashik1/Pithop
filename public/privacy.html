@@ -99,8 +99,19 @@
 
       <h2>What stays on your device</h2>
       <p>
-        Your last trip (route, stops, and the stops you added to your plan) is stored in your browser's local storage
-        so the app works offline. It never leaves your device. To erase it, clear this site's browsing data.
+        Your last trip and your saved-trips library (routes, stops, and the stops you added to your plan) are stored
+        in your browser's local storage so the app works offline. They never leave your device. To erase them, clear
+        this site's browsing data.
+      </p>
+
+      <h2>Community places you share</h2>
+      <p>
+        If you use <strong>“📍 Add a place”</strong>, the place you submit — its name, optional note, category,
+        suggested visit time and map coordinates — is stored in our database and shown
+        <strong>publicly to every user</strong> of the app. Don't include personal information in names or notes.
+        Submissions are not tied to an account; we keep a short-lived, IP-based counter solely to limit spam
+        (10 submissions per day). Places reported by several users are hidden automatically. To request removal of
+        a submission, contact us (below).
       </p>
 
       <h2>Services we rely on</h2>
@@ -124,6 +135,10 @@
         <tr>
           <td>Hosting</td>
           <td><a href="https://vercel.com/">Vercel</a> (standard web-server request logs)</td>
+        </tr>
+        <tr>
+          <td>Community places database</td>
+          <td><a href="https://upstash.com/">Upstash</a> (stores only the submitted place data described above)</td>
         </tr>
         <tr>
           <td>Navigation links</td>

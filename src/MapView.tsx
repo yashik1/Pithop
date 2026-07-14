@@ -13,12 +13,19 @@ interface Props {
   selectedId: string | null;
   onSelect: (id: string) => void;
   onTogglePlan: (id: string) => void;
+  communityOn: boolean;
+  addArmed: boolean;
+  onToggleAdd: () => void;
+  onPickPoint: (p: { lat: number; lng: number }) => void;
+  pinPreview: { lat: number; lng: number } | null;
 }
 
 interface LiveProps {
   planIds: Set<string>;
   onSelect: (id: string) => void;
   onTogglePlan: (id: string) => void;
+  addArmed: boolean;
+  onPickPoint: (p: { lat: number; lng: number }) => void;
 }
 
 function buildPopup(stop: Stop, live: { current: LiveProps }): HTMLElement {
@@ -34,6 +41,7 @@ function buildPopup(stop: Stop, live: { current: LiveProps }): HTMLElement {
   div.innerHTML = `
     ${img}
     <div class="p-name"></div>
+    ${stop.source === 'community' ? '<div class="p-community">👥 Traveller tip</div>' : ''}
     <div class="p-desc"></div>
     <div class="p-meta">${cat.emoji} ${cat.label}</div>
     <div class="p-meta">⏱ ~${fmtDur(stop.visitMin)} visit · 🚗 ~${stop.detourMin} min off route</div>
@@ -55,14 +63,27 @@ function buildPopup(stop: Stop, live: { current: LiveProps }): HTMLElement {
   return div;
 }
 
-export function MapView({ route, stops, planIds, selectedId, onSelect, onTogglePlan }: Props) {
+export function MapView({
+  route,
+  stops,
+  planIds,
+  selectedId,
+  onSelect,
+  onTogglePlan,
+  communityOn,
+  addArmed,
+  onToggleAdd,
+  onPickPoint,
+  pinPreview,
+}: Props) {
   const divRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
   const routeLayerRef = useRef<L.LayerGroup | null>(null);
   const stopsLayerRef = useRef<L.LayerGroup | null>(null);
+  const pinLayerRef = useRef<L.LayerGroup | null>(null);
   const markersRef = useRef(new Map<string, L.CircleMarker>());
-  const liveRef = useRef<LiveProps>({ planIds, onSelect, onTogglePlan });
-  liveRef.current = { planIds, onSelect, onTogglePlan };
+  const liveRef = useRef<LiveProps>({ planIds, onSelect, onTogglePlan, addArmed, onPickPoint });
+  liveRef.current = { planIds, onSelect, onTogglePlan, addArmed, onPickPoint };
 
   useEffect(() => {
     const map = L.map(divRef.current!, { preferCanvas: true }).setView([39.5, -98.35], 4);
@@ -77,6 +98,11 @@ export function MapView({ route, stops, planIds, selectedId, onSelect, onToggleP
     L.tileLayer(tiles.url, { attribution: tiles.attribution, maxZoom: 19 }).addTo(map);
     routeLayerRef.current = L.layerGroup().addTo(map);
     stopsLayerRef.current = L.layerGroup().addTo(map);
+    pinLayerRef.current = L.layerGroup().addTo(map);
+    map.on('click', (e: L.LeafletMouseEvent) => {
+      const live = liveRef.current;
+      if (live.addArmed) live.onPickPoint({ lat: e.latlng.lat, lng: e.latlng.lng });
+    });
     mapRef.current = map;
     return () => {
       map.remove();
@@ -141,5 +167,38 @@ export function MapView({ route, stops, planIds, selectedId, onSelect, onToggleP
     marker.openPopup();
   }, [selectedId]);
 
-  return <div ref={divRef} className="map" />;
+  // Crosshair cursor while picking a spot for a new community place.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (map) map.getContainer().style.cursor = addArmed ? 'crosshair' : '';
+  }, [addArmed]);
+
+  // Dashed preview ring where the new place will go.
+  useEffect(() => {
+    const layer = pinLayerRef.current;
+    if (!layer) return;
+    layer.clearLayers();
+    if (!pinPreview) return;
+    layer.addLayer(
+      L.circleMarker([pinPreview.lat, pinPreview.lng], {
+        radius: 11,
+        color: '#c2419a',
+        weight: 2.5,
+        dashArray: '4 4',
+        fillColor: '#c2419a',
+        fillOpacity: 0.25,
+      }),
+    );
+  }, [pinPreview]);
+
+  return (
+    <div className="map">
+      <div ref={divRef} className="map-canvas" />
+      {communityOn && (
+        <button type="button" className={`map-add${addArmed ? ' armed' : ''}`} onClick={onToggleAdd}>
+          {addArmed ? 'Tap the map where the place is — or cancel ✕' : '📍 Add a place'}
+        </button>
+      )}
+    </div>
+  );
 }
