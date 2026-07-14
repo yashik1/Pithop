@@ -116,9 +116,10 @@ function getPosition(): Promise<GeolocationPosition> {
     navigator.geolocation.getCurrentPosition(
       resolve,
       (err) => {
-        // "Unavailable"/timeout are often transient — retry once with a fresh
-        // fix. A denied permission won't change on retry, so fail fast.
-        if (err.code !== err.PERMISSION_DENIED) {
+        // A transient "position unavailable" often clears on a second try.
+        // Don't retry a timeout (we already waited the full window) or a
+        // denied permission (it won't change) — fail fast so the user can type.
+        if (err.code === err.POSITION_UNAVAILABLE) {
           navigator.geolocation.getCurrentPosition(resolve, fail, { ...opts, maximumAge: 0 });
         } else {
           fail(err);
@@ -186,6 +187,7 @@ export default function App() {
   const [addParking, setAddParking] = useState<'free' | 'paid' | 'none' | ''>('');
   const [addBusy, setAddBusy] = useState(false);
   const [addError, setAddError] = useState<string | null>(null);
+  const [locating, setLocating] = useState(false);
   const routeCalcRef = useRef<{ calcRoute: LatLng[]; cum: number[] } | null>(null);
 
   // Bumped on every new search so a slow response from an old search can't
@@ -632,14 +634,18 @@ export default function App() {
   }, [selectedId, wikiIntros]);
 
   function useMyLocation() {
-    getPosition().then(
-      (pos) => {
-        setError(null);
-        setFromText('My location');
-        setFromPick({ lat: pos.coords.latitude, lng: pos.coords.longitude });
-      },
-      (e: Error) => setError(e.message),
-    );
+    if (locating) return;
+    setLocating(true);
+    getPosition()
+      .then(
+        (pos) => {
+          setError(null);
+          setFromText('My location');
+          setFromPick({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+        },
+        (e: Error) => setError(e.message),
+      )
+      .finally(() => setLocating(false));
   }
 
   function toggleAhead() {
@@ -727,8 +733,15 @@ export default function App() {
                   setFromPick({ lat: p.lat, lng: p.lng });
                 }}
               />
-              <button type="button" className="geo-btn" title="Use my location" onClick={useMyLocation}>
-                📍
+              <button
+                type="button"
+                className={`geo-btn${locating ? ' locating' : ''}`}
+                title="Use my location"
+                aria-label="Use my current location as the starting point"
+                disabled={locating}
+                onClick={useMyLocation}
+              >
+                {locating ? '⏳' : '📍'}
               </button>
             </div>
             <PlaceInput
