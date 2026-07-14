@@ -60,6 +60,17 @@ async function runQuery(endpoint: string, query: string): Promise<OverpassElemen
   }
 }
 
+// Read a free/paid parking signal from OSM tags, when unambiguous:
+// an explicit `parking:fee`, or a `fee` on an actual parking amenity.
+// Returns undefined when there's no clear signal (most POIs).
+export function parkingFromTags(tags: Record<string, string>): 'free' | 'paid' | undefined {
+  const fee = tags['parking:fee'] ?? (tags.amenity === 'parking' ? tags.fee : undefined);
+  if (fee === undefined) return undefined;
+  if (fee === 'no' || fee === 'free') return 'free';
+  if (fee === 'unknown' || fee === '') return undefined;
+  return 'paid'; // 'yes', a price string, currency, etc.
+}
+
 // Turn raw OSM tags into a short human-readable "what's here" line, e.g.
 // "Mexican, barbecue · Outdoor seating · Open Mo-Su 07:00-22:00" for a
 // restaurant or "Restrooms · Picnic tables" for a rest area.
@@ -151,6 +162,7 @@ export async function fetchRoadsideStops(samples: LatLng[]): Promise<Stop[]> {
       visitMin: visitMinutes(cat.kind),
       source: 'osm',
       description: describeOsm(tags, cat.kind),
+      parking: parkingFromTags(tags),
       offRouteKm: 0,
       alongKm: 0,
       detourMin: 0,

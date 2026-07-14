@@ -12,6 +12,8 @@ export interface Stop {
   description?: string;
   imageUrl?: string;
   wikiUrl?: string;
+  // Parking at the spot, when known: free / paid, or 'none' (no on-site parking).
+  parking?: 'free' | 'paid' | 'none';
   offRouteKm: number;
   alongKm: number;
   detourMin: number;

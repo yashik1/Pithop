@@ -18,12 +18,14 @@ const MAX_RESULTS = 500;
 const DAILY_SUBMISSIONS_PER_IP = 10;
 const CATEGORIES = ['fun', 'views', 'nature', 'history', 'museums', 'food', 'rest'];
 const VISIT_OPTIONS = [15, 30, 60, 120];
+const PARKING_OPTIONS = ['free', 'paid', 'none'];
 
 interface CommunityRecord {
   name: string;
   note: string;
   category: string;
   visitMin: number;
+  parking?: string;
   lat: number;
   lng: number;
   createdAt: number;
@@ -143,6 +145,7 @@ export default async function handler(req: any, res: any) {
       res.status(400).json({ error: 'coordinates out of range' });
       return;
     }
+    const parking = PARKING_OPTIONS.includes(body.parking) ? body.parking : undefined;
 
     const ip = String(req.headers?.['x-forwarded-for'] ?? 'unknown').split(',')[0].trim() || 'unknown';
     const rlKey = `community:rl:${ip}`;
@@ -154,7 +157,7 @@ export default async function handler(req: any, res: any) {
     }
 
     const id = `cs_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
-    const record: CommunityRecord = { name, note, category, visitMin, lat, lng, createdAt: Date.now() };
+    const record: CommunityRecord = { name, note, category, visitMin, parking, lat, lng, createdAt: Date.now() };
     await redis.hset(STOPS_KEY, { [id]: JSON.stringify(record) });
     res.status(200).json({ stop: { id, ...record } });
     return;

@@ -28,6 +28,7 @@ interface CommunityRecord {
   note?: string;
   category: CategoryId;
   visitMin?: number;
+  parking?: 'free' | 'paid' | 'none';
   lat: number;
   lng: number;
 }
@@ -43,6 +44,7 @@ function toStop(r: CommunityRecord): Stop {
     visitMin: r.visitMin ?? visitMinutes('community'),
     source: 'community',
     description: r.note || undefined,
+    parking: r.parking,
     offRouteKm: 0,
     alongKm: 0,
     detourMin: 0,
@@ -66,6 +68,7 @@ export interface CommunitySubmission {
   note: string;
   category: CategoryId;
   visitMin: number;
+  parking: 'free' | 'paid' | 'none' | '';
   lat: number;
   lng: number;
 }
