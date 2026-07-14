@@ -8,6 +8,15 @@
     <link rel="icon" href="/icon.svg" type="image/svg+xml" />
     <link rel="manifest" href="/manifest.webmanifest" />
     <title>SideQuest — fun stops on long drives</title>
+    <script>
+      // Apply the stored theme before first paint to avoid a flash.
+      try {
+        var m = localStorage.getItem('sq-theme');
+        var dark =
+          m === 'dark' || ((m === null || m === 'auto') && matchMedia('(prefers-color-scheme: dark)').matches);
+        document.documentElement.dataset.theme = dark ? 'dark' : 'light';
+      } catch (e) {}
+    </script>
     <style>
       html,
       body,
@@ -15,6 +24,11 @@
         height: 100%;
         margin: 0;
         background: #f2f5fa;
+      }
+      :root[data-theme='dark'],
+      :root[data-theme='dark'] body,
+      :root[data-theme='dark'] #root {
+        background: #0f1826;
       }
     </style>
   </head>

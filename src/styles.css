@@ -203,8 +203,34 @@ body {
 }
 
 .brand {
-  padding: 22px 20px 10px;
+  position: relative;
+  padding: 22px 64px 10px 20px;
   color: #fff;
+}
+
+.theme-btn {
+  position: absolute;
+  top: 22px;
+  right: 16px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  height: 42px;
+  font-size: 18px;
+  background: rgba(255, 255, 255, 0.16);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 13px;
+  cursor: pointer;
+  transition: background 0.15s var(--ease-out), transform 0.12s var(--ease-out);
+}
+
+.theme-btn:hover {
+  background: rgba(255, 255, 255, 0.28);
+}
+
+.theme-btn:active {
+  transform: scale(0.92);
 }
 
 .brand h1 {
@@ -418,6 +444,7 @@ body {
 /* ---------- Route summary card ---------- */
 
 .summary {
+  position: relative;
   margin: 12px 14px 0;
   padding: 14px 16px;
   background: var(--card);
@@ -425,6 +452,47 @@ body {
   border-radius: var(--r-lg);
   box-shadow: var(--shadow-1);
   animation: rise-in 0.35s var(--ease-out) backwards;
+}
+
+.summary-actions {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  display: flex;
+  gap: 6px;
+}
+
+.summary-save,
+.summary-clear {
+  min-height: 30px;
+  padding: 4px 10px;
+  border: 1px solid var(--line-strong);
+  border-radius: 999px;
+  background: none;
+  color: var(--ink-3);
+  font-family: inherit;
+  font-size: 11.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: color 0.15s var(--ease-out), border-color 0.15s var(--ease-out),
+    background 0.15s var(--ease-out);
+}
+
+.summary-save:hover {
+  color: var(--primary-deep);
+  border-color: var(--primary);
+  background: rgba(37, 99, 235, 0.08);
+}
+
+.summary-clear:hover {
+  color: #d64545;
+  border-color: #d64545;
+  background: rgba(214, 69, 69, 0.08);
+}
+
+/* Keep the route label clear of the buttons. */
+.summary-route {
+  padding-right: 140px;
 }
 
 .summary-route {
@@ -978,6 +1046,91 @@ body {
   animation: chip-pop 0.32s var(--spring);
 }
 
+/* ---------- Saved trips (start screen) ---------- */
+
+.trips {
+  margin: 12px 14px 0;
+  padding: 14px 16px 8px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-1);
+  animation: rise-in 0.35s var(--ease-out) backwards;
+}
+
+.trips h2 {
+  margin: 0 0 4px;
+  font-size: 11.5px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--ink-3);
+}
+
+.trip-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.trip-load {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  padding: 8px 10px;
+  margin-left: -10px;
+  border: none;
+  border-radius: 10px;
+  background: none;
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.15s var(--ease-out);
+}
+
+.trip-load:hover {
+  background: rgba(37, 99, 235, 0.08);
+}
+
+.trip-name {
+  max-width: 100%;
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.trip-meta {
+  font-size: 12px;
+  color: var(--ink-3);
+}
+
+.trip-del {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  flex-shrink: 0;
+  border: none;
+  border-radius: 8px;
+  background: none;
+  color: var(--ink-3);
+  cursor: pointer;
+  font-size: 13px;
+  transition: background 0.15s var(--ease-out), color 0.15s var(--ease-out);
+}
+
+.trip-del:hover {
+  color: #d64545;
+  background: rgba(214, 69, 69, 0.1);
+}
+
 /* ---------- Empty state ---------- */
 
 .hint {
@@ -1338,4 +1491,198 @@ body {
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
   }
+}
+
+/* ============================================================
+   Dark theme — activated by <html data-theme="dark">, which is
+   set from the ☀️/🌙/🌓 toggle (or the OS setting in auto mode).
+   ============================================================ */
+
+:root[data-theme='dark'] {
+  --primary: #4f8ef7;
+  --primary-deep: #8ab4ff;
+  --cyan: #22d3ee;
+  --ink: #e8eef7;
+  --ink-2: #aebdd1;
+  --ink-3: #8195ad;
+  --bg: #0f1826;
+  --card: #16223a;
+  --line: #24334f;
+  --line-strong: #31446a;
+  --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.3), 0 2px 8px rgba(0, 0, 0, 0.35);
+  --shadow-2: 0 4px 10px rgba(0, 0, 0, 0.4), 0 12px 28px rgba(0, 0, 0, 0.45);
+  --shadow-3: 0 14px 40px rgba(0, 0, 0, 0.6);
+}
+
+:root[data-theme='dark'] ::selection {
+  background: #1e3a8a;
+}
+
+:root[data-theme='dark'] .sidebar {
+  scrollbar-color: #31446a transparent;
+}
+
+:root[data-theme='dark'] .sidebar::-webkit-scrollbar-thumb {
+  background: #31446a;
+  border-color: var(--bg);
+}
+
+:root[data-theme='dark'] .search input {
+  background: rgba(12, 20, 35, 0.92);
+  color: var(--ink);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.45);
+}
+
+:root[data-theme='dark'] .search input:focus {
+  background: #0e1930;
+  box-shadow: 0 0 0 3px rgba(147, 197, 253, 0.35), 0 4px 14px rgba(0, 0, 0, 0.5);
+}
+
+/* The white CTA keeps its light look — pin its text to the light-mode blue. */
+:root[data-theme='dark'] .go-btn {
+  color: #1d4ed8;
+}
+
+:root[data-theme='dark'] .suggestions li.active {
+  background: #223150;
+}
+
+:root[data-theme='dark'] .error {
+  background: #2b161a;
+  color: #f3a6a6;
+  border-color: #59272b;
+  border-left-color: #d64545;
+}
+
+:root[data-theme='dark'] .notice {
+  background: #2a2110;
+  color: #e8c07a;
+  border-color: #54431f;
+  border-left-color: #e8a53a;
+}
+
+:root[data-theme='dark'] .summary-plan,
+:root[data-theme='dark'] .stop-todo {
+  color: #8fe6bb;
+  background: #122b1e;
+  border-color: #1f4a34;
+}
+
+:root[data-theme='dark'] .summary-hotels,
+:root[data-theme='dark'] .stop-links a.aff,
+:root[data-theme='dark'] .hint-example button {
+  background: #1d2c4c;
+  color: #9dc1ff;
+}
+
+:root[data-theme='dark'] .summary-hotels:hover {
+  background: #24365c;
+}
+
+:root[data-theme='dark'] .ahead {
+  background: #1a2740;
+}
+
+:root[data-theme='dark'] .ahead:hover {
+  background: #1f2e4c;
+}
+
+:root[data-theme='dark'] .chip {
+  background: var(--card);
+  color: var(--ink-2);
+}
+
+:root[data-theme='dark'] .chip-count {
+  background: #24334f;
+  color: #9fb2cc;
+}
+
+:root[data-theme='dark'] .selects select {
+  background-color: var(--card);
+  color: var(--ink);
+}
+
+:root[data-theme='dark'] .plan {
+  background: linear-gradient(180deg, #141f37, #16223a 55%);
+  border-color: #283a5c;
+}
+
+:root[data-theme='dark'] .plan-item::after {
+  border-left-color: #33507e;
+}
+
+:root[data-theme='dark'] .plan-remove:hover {
+  background: #3a1c20;
+}
+
+:root[data-theme='dark'] .list-header {
+  background: rgba(15, 24, 38, 0.88);
+}
+
+:root[data-theme='dark'] .stop-card.selected {
+  background: #1a2a49;
+}
+
+:root[data-theme='dark'] .add-btn {
+  background: var(--card);
+  color: var(--ink-2);
+}
+
+:root[data-theme='dark'] .add-btn.added {
+  background: linear-gradient(135deg, #10b981, #059669);
+  color: #fff;
+}
+
+:root[data-theme='dark'] .hint {
+  border-color: #31446a;
+}
+
+/* Map chrome */
+:root[data-theme='dark'] .leaflet-popup-content-wrapper,
+:root[data-theme='dark'] .leaflet-popup-tip {
+  background: var(--card);
+  color: var(--ink);
+}
+
+:root[data-theme='dark'] .leaflet-container a.leaflet-popup-close-button {
+  background: rgba(22, 34, 58, 0.92);
+  color: #aebdd1;
+}
+
+:root[data-theme='dark'] .leaflet-bar a,
+:root[data-theme='dark'] .leaflet-touch .leaflet-bar a {
+  background: var(--card);
+  color: #c6d3e6;
+  border-bottom-color: #24334f;
+}
+
+:root[data-theme='dark'] .leaflet-bar a:hover,
+:root[data-theme='dark'] .leaflet-touch .leaflet-bar a:hover {
+  background: #1d2c4c;
+  color: #9dc1ff;
+}
+
+:root[data-theme='dark'] .leaflet-container .leaflet-control-attribution {
+  background: rgba(15, 24, 38, 0.85);
+  color: var(--ink-2);
+}
+
+:root[data-theme='dark'] .leaflet-container .leaflet-control-attribution a {
+  color: #9dc1ff;
+}
+
+/* Invert the (light) raster tiles into a night map. Applies only to the tile
+   pane, so markers, the route line and popups keep their true colors. */
+:root[data-theme='dark'] .leaflet-tile-pane {
+  filter: invert(1) hue-rotate(180deg) brightness(0.91) contrast(0.9) saturate(0.8);
+}
+
+:root[data-theme='dark'] .map-popup .p-todo {
+  color: #8fe6bb;
+  background: #122b1e;
+  border-color: #1f4a34;
+}
+
+:root[data-theme='dark'] .leaflet-container {
+  background: #0b1322;
 }

@@ -69,6 +69,10 @@ museum ≈ 90 min, theme park ≈ 4 h, …).
   tap 📍 to use your current location as the origin, and enable
   **"only stops ahead of me (next 80 km)"** to filter the list/map to what's
   coming up. Mobile layout puts the map on top and the list below.
+- **Saved trips:** 💾 on the route summary stores a trip (route, stops and
+  plan) in an on-device library — reopen or delete them from the start
+  screen. Once saved (or loaded), plan edits live-sync to the library entry;
+  a fresh search starts a new, unsaved trip.
 - **Works offline:** the last searched trip (route, stops and your chosen
   plan) is saved on the device, and map tiles/photos you've viewed are cached.
   Lose signal in the middle of nowhere and reopen the app — your trip, plan

@@ -7,35 +7,29 @@ import { fetchGeoapifyRoadside, hasGeoapify } from './api/geoapify';
 import type { Stop } from './types';
 import { CATEGORIES, CATEGORY_MAP, thingsToDo, type CategoryId } from './lib/categories';
 import { anyAffiliate, gasCashbackLink, hotelsLink, ticketsLink } from './lib/affiliates';
+import { getThemeMode, setThemeMode, type ThemeMode } from './lib/theme';
+import {
+  clearCurrentTrip,
+  deleteSavedTrip,
+  listSavedTrips,
+  loadCurrentTrip,
+  saveCurrentTrip,
+  saveTripToLibrary,
+  updateSavedTrip,
+  type StoredTrip,
+  type TripData,
+} from './lib/tripStore';
+
+const THEME_LABELS: Record<ThemeMode, { icon: string; label: string }> = {
+  auto: { icon: '🌓', label: 'Auto (follows your device)' },
+  dark: { icon: '🌙', label: 'Dark' },
+  light: { icon: '☀️', label: 'Light' },
+};
+const THEME_CYCLE: Record<ThemeMode, ThemeMode> = { auto: 'dark', dark: 'light', light: 'auto' };
 import { cumulativeKm, haversineKm, projectOntoRoute, sampleAlong, simplify, type LatLng } from './lib/geo';
 import { fmtDur } from './lib/format';
 import { MapView } from './MapView';
 import { PlaceInput } from './components/PlaceInput';
-
-// Last successful trip, persisted so it survives restarts and works with no
-// signal: reopening the app offline restores the route, stops and plan.
-const TRIP_KEY = 'sidequest-trip-v1';
-
-interface SavedTrip {
-  fromText: string;
-  toText: string;
-  routeLabel: string;
-  route: RouteResult;
-  stops: Stop[];
-  planIds: string[];
-}
-
-function loadSavedTrip(): SavedTrip | null {
-  try {
-    const raw = localStorage.getItem(TRIP_KEY);
-    if (!raw) return null;
-    const trip = JSON.parse(raw) as SavedTrip;
-    if (!trip.route?.coords?.length || !Array.isArray(trip.stops) || !trip.stops.length) return null;
-    return trip;
-  } catch {
-    return null;
-  }
-}
 
 const DETOUR_OPTIONS = [5, 10, 15, 25, 40];
 const VISIT_OPTIONS = [
@@ -94,51 +88,99 @@ export default function App() {
   const [wikiIntros, setWikiIntros] = useState<Record<string, string>>({});
   const [aheadOnly, setAheadOnly] = useState(false);
   const [myAlongKm, setMyAlongKm] = useState<number | null>(null);
+  const [themeMode, setThemeModeState] = useState<ThemeMode>(getThemeMode);
+  const [savedTrips, setSavedTrips] = useState<StoredTrip[]>(listSavedTrips);
   const routeCalcRef = useRef<{ calcRoute: LatLng[]; cum: number[] } | null>(null);
 
   // Bumped on every new search so a slow response from an old search can't
   // overwrite the results of a newer one.
   const searchSeq = useRef(0);
+  // Library entry the active trip belongs to (saved or loaded from it) —
+  // edits live-sync to that entry. A fresh search detaches until re-saved.
+  const activeLibraryIdRef = useRef<string | null>(null);
+
+  // Make a stored trip the active one: route, stops, plan, map refs.
+  function applyTrip(t: TripData) {
+    const calcRoute = simplify(t.route.coords, 1500);
+    routeCalcRef.current = { calcRoute, cum: cumulativeKm(calcRoute) };
+    setFromText(t.fromText);
+    setToText(t.toText);
+    setFromPick(null);
+    setToPick(null);
+    setRoute(t.route);
+    setRouteLabel(t.routeLabel);
+    setStops(t.stops);
+    setPlanIds(new Set(t.planIds));
+    setSelectedId(null);
+    setAheadOnly(false);
+    setMyAlongKm(null);
+  }
+
+  // Route geometry is simplified before writing to stay inside storage quotas.
+  const buildTripData = (): TripData | null =>
+    route && stops.length
+      ? {
+          fromText,
+          toText,
+          routeLabel,
+          route: { ...route, coords: simplify(route.coords, 1500) },
+          stops,
+          planIds: [...planIds],
+        }
+      : null;
 
   // Restore the last planned trip on startup — works fully offline since
   // everything needed (route, stops, plan) comes from localStorage.
   useEffect(() => {
-    const saved = loadSavedTrip();
+    const saved = loadCurrentTrip();
     if (!saved) return;
-    const calcRoute = simplify(saved.route.coords, 1500);
-    routeCalcRef.current = { calcRoute, cum: cumulativeKm(calcRoute) };
-    setFromText(saved.fromText);
-    setToText(saved.toText);
-    setRoute(saved.route);
-    setRouteLabel(saved.routeLabel);
-    setStops(saved.stops);
-    setPlanIds(new Set(saved.planIds));
+    applyTrip(saved);
     if (!navigator.onLine) setNotice('You are offline — showing your saved trip.');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Keep the saved trip current (plan edits included). Route geometry is
-  // simplified before writing to stay well inside localStorage quotas.
+  // Keep the auto-saved current trip fresh (plan edits included), and
+  // live-sync the library entry this trip belongs to, if any.
   useEffect(() => {
-    if (!route || stops.length === 0) return;
-    try {
-      const payload: SavedTrip = {
-        fromText,
-        toText,
-        routeLabel,
-        route: { ...route, coords: simplify(route.coords, 1500) },
-        stops,
-        planIds: [...planIds],
-      };
-      localStorage.setItem(TRIP_KEY, JSON.stringify(payload));
-    } catch {
-      // Storage full or blocked — the app still works, just without offline restore.
+    const t = buildTripData();
+    if (!t) return;
+    saveCurrentTrip(t);
+    if (activeLibraryIdRef.current) {
+      updateSavedTrip(activeLibraryIdRef.current, t);
+      setSavedTrips(listSavedTrips());
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [route, stops, planIds, routeLabel]);
 
+  function handleSaveTrip() {
+    const t = buildTripData();
+    if (!t) return;
+    const err = saveTripToLibrary(t);
+    const list = listSavedTrips();
+    setSavedTrips(list);
+    if (!err) activeLibraryIdRef.current = list.find((s) => s.routeLabel === t.routeLabel)?.id ?? null;
+    setNotice(err ?? '💾 Trip saved — it keeps updating as you edit, and you can reopen it from the start screen.');
+  }
+
+  function handleLoadTrip(t: StoredTrip) {
+    searchSeq.current++; // invalidates any in-flight search
+    activeLibraryIdRef.current = t.id;
+    setBusy(null);
+    setError(null);
+    setNotice(null);
+    applyTrip(t);
+  }
+
+  function handleDeleteTrip(t: StoredTrip) {
+    if (!window.confirm(`Delete saved trip "${t.routeLabel}"?`)) return;
+    if (activeLibraryIdRef.current === t.id) activeLibraryIdRef.current = null;
+    setSavedTrips(deleteSavedTrip(t.id));
+  }
+
   async function findStops() {
     const token = ++searchSeq.current;
     const fresh = () => searchSeq.current === token;
+    activeLibraryIdRef.current = null; // a fresh search is a new, unsaved trip
     setBusy('Locating places…');
     setError(null);
     setNotice(null);
@@ -230,6 +272,30 @@ export default function App() {
     } finally {
       if (fresh()) setBusy(null);
     }
+  }
+
+  // Wipe the whole trip: search fields, results, plan, map and the saved
+  // offline copy — back to the blank start screen.
+  function clearTrip() {
+    if (planIds.size > 0 && !window.confirm('Clear this trip? Your stop list will be lost.')) return;
+    searchSeq.current++; // invalidates any in-flight search
+    setRoute(null);
+    setRouteLabel('');
+    setStops([]);
+    setPlanIds(new Set());
+    setSelectedId(null);
+    setError(null);
+    setNotice(null);
+    setBusy(null);
+    setAheadOnly(false);
+    setMyAlongKm(null);
+    setFromText('');
+    setToText('');
+    setFromPick(null);
+    setToPick(null);
+    routeCalcRef.current = null;
+    activeLibraryIdRef.current = null;
+    clearCurrentTrip();
   }
 
   function toggleCat(id: CategoryId) {
@@ -337,6 +403,19 @@ export default function App() {
             <h1>
               <span className="brand-icon">🛣️</span> <span className="brand-name">SideQuest</span>
             </h1>
+            <button
+              type="button"
+              className="theme-btn"
+              title={`Theme: ${THEME_LABELS[themeMode].label} — click to change`}
+              aria-label={`Theme: ${THEME_LABELS[themeMode].label} — click to change`}
+              onClick={() => {
+                const next = THEME_CYCLE[themeMode];
+                setThemeModeState(next);
+                setThemeMode(next);
+              }}
+            >
+              {THEME_LABELS[themeMode].icon}
+            </button>
             <p>Fun stops, hidden gems and breaks along your drive</p>
           </header>
 
@@ -387,6 +466,14 @@ export default function App() {
 
         {route && !busy && (
           <div className="summary">
+            <div className="summary-actions">
+              <button type="button" className="summary-save" title="Save this trip with all its stops" onClick={handleSaveTrip}>
+                💾 Save
+              </button>
+              <button type="button" className="summary-clear" title="Clear this trip" onClick={clearTrip}>
+                ✕ Clear
+              </button>
+            </div>
             <div className="summary-route">{routeLabel}</div>
             <div className="summary-stats">
               {Math.round(route.distanceKm)} km · {fmtDur(route.durationMin)} drive · {stops.length} stops found
@@ -552,6 +639,31 @@ export default function App() {
               })}
             </div>
           </>
+        )}
+
+        {!route && !busy && savedTrips.length > 0 && (
+          <div className="trips">
+            <h2>💾 Saved trips</h2>
+            {savedTrips.map((t) => (
+              <div key={t.id} className="trip-item">
+                <button type="button" className="trip-load" onClick={() => handleLoadTrip(t)}>
+                  <span className="trip-name">{t.routeLabel}</span>
+                  <span className="trip-meta">
+                    {t.stops.length} stops · {t.planIds.length} in plan · updated{' '}
+                    {new Date(t.savedAt).toLocaleDateString()}
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  className="trip-del"
+                  title="Delete saved trip"
+                  onClick={() => handleDeleteTrip(t)}
+                >
+                  ✕
+                </button>
+              </div>
+            ))}
+          </div>
         )}
 
         {!route && !busy && !error && (
