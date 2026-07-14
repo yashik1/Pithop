@@ -241,6 +241,33 @@ export default function App() {
     }
   }
 
+  // Wipe the whole trip: search fields, results, plan, map and the saved
+  // offline copy — back to the blank start screen.
+  function clearTrip() {
+    if (planIds.size > 0 && !window.confirm('Clear this trip? Your stop list will be lost.')) return;
+    searchSeq.current++; // invalidates any in-flight search
+    setRoute(null);
+    setRouteLabel('');
+    setStops([]);
+    setPlanIds(new Set());
+    setSelectedId(null);
+    setError(null);
+    setNotice(null);
+    setBusy(null);
+    setAheadOnly(false);
+    setMyAlongKm(null);
+    setFromText('');
+    setToText('');
+    setFromPick(null);
+    setToPick(null);
+    routeCalcRef.current = null;
+    try {
+      localStorage.removeItem(TRIP_KEY);
+    } catch {
+      // Storage blocked — nothing saved to remove anyway.
+    }
+  }
+
   function toggleCat(id: CategoryId) {
     setCats((prev) => {
       const next = new Set(prev);
@@ -409,6 +436,9 @@ export default function App() {
 
         {route && !busy && (
           <div className="summary">
+            <button type="button" className="summary-clear" title="Clear this trip" onClick={clearTrip}>
+              ✕ Clear
+            </button>
             <div className="summary-route">{routeLabel}</div>
             <div className="summary-stats">
               {Math.round(route.distanceKm)} km · {fmtDur(route.durationMin)} drive · {stops.length} stops found
