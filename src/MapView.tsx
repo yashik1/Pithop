@@ -45,6 +45,13 @@ function buildPopup(stop: Stop, live: { current: LiveProps }): HTMLElement {
     <div class="p-desc"></div>
     <div class="p-meta">${cat.emoji} ${cat.label}</div>
     <div class="p-meta">⏱ ~${fmtDur(stop.visitMin)} visit · 🚗 ~${stop.detourMin} min off route</div>
+    ${
+      stop.parking
+        ? `<div class="p-meta">🅿️ ${
+            stop.parking === 'free' ? 'Free parking' : stop.parking === 'paid' ? 'Paid parking' : 'No parking on site'
+          }</div>`
+        : ''
+    }
     <div class="p-todo"></div>
     <div class="p-links"><a class="p-link" href="${gmaps}" target="_blank" rel="noreferrer">Open in Google Maps ↗</a>${wiki}</div>
     <button type="button" class="p-add"></button>`;

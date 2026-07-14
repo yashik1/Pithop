@@ -32,6 +32,12 @@ const THEME_LABELS: Record<ThemeMode, { icon: string; label: string }> = {
   light: { icon: '☀️', label: 'Light' },
 };
 const THEME_CYCLE: Record<ThemeMode, ThemeMode> = { auto: 'dark', dark: 'light', light: 'auto' };
+
+const PARKING_LABEL: Record<'free' | 'paid' | 'none', string> = {
+  free: 'Free parking',
+  paid: 'Paid parking',
+  none: 'No parking on site',
+};
 import { cumulativeKm, haversineKm, projectOntoRoute, sampleAlong, simplify, type LatLng } from './lib/geo';
 import { fmtDur } from './lib/format';
 import { MapView } from './MapView';
@@ -104,6 +110,7 @@ export default function App() {
   const [addNote, setAddNote] = useState('');
   const [addCategory, setAddCategory] = useState<CategoryId>('fun');
   const [addVisit, setAddVisit] = useState(30);
+  const [addParking, setAddParking] = useState<'free' | 'paid' | 'none' | ''>('');
   const [addBusy, setAddBusy] = useState(false);
   const [addError, setAddError] = useState<string | null>(null);
   const routeCalcRef = useRef<{ calcRoute: LatLng[]; cum: number[] } | null>(null);
@@ -218,6 +225,7 @@ export default function App() {
     setAddNote('');
     setAddCategory('fun');
     setAddVisit(30);
+    setAddParking('');
     setAddError(null);
   }
 
@@ -231,6 +239,7 @@ export default function App() {
         note: addNote.trim(),
         category: addCategory,
         visitMin: addVisit,
+        parking: addParking,
         lat: addPin.lat,
         lng: addPin.lng,
       });
@@ -576,6 +585,16 @@ export default function App() {
                 <option value={120}>~2 hour stop</option>
               </select>
             </div>
+            <select
+              className="add-parking"
+              value={addParking}
+              onChange={(e) => setAddParking(e.target.value as typeof addParking)}
+            >
+              <option value="">🅿️ Parking? (optional)</option>
+              <option value="free">🅿️ Free parking</option>
+              <option value="paid">🅿️ Paid parking</option>
+              <option value="none">🅿️ No parking on site</option>
+            </select>
             <textarea
               value={addNote}
               maxLength={200}
@@ -733,6 +752,9 @@ export default function App() {
                           {s.imageUrl && <img className="stop-photo" src={s.imageUrl} alt={s.name} loading="lazy" />}
                           {intro && intro !== s.description && <p className="stop-intro">{intro}</p>}
                           <p className="stop-todo">💡 {thingsToDo(s.kind)}</p>
+                          {s.parking && (
+                            <p className={`stop-parking ${s.parking}`}>🅿️ {PARKING_LABEL[s.parking]}</p>
+                          )}
                           <div className="stop-links" onClick={(e) => e.stopPropagation()}>
                             {ticketsLink(s.name, s.kind) && (
                               <a className="aff" href={ticketsLink(s.name, s.kind)!} target="_blank" rel="sponsored noreferrer">

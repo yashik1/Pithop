@@ -8,7 +8,7 @@
 import type { LatLng } from '../lib/geo';
 import type { Stop } from '../types';
 import { visitMinutes, type CategoryId } from '../lib/categories';
-import { describeOsm } from './overpass';
+import { describeOsm, parkingFromTags } from './overpass';
 import type { GeocodeResult } from './geocode';
 import type { RouteResult } from './route';
 import type { PlacePick } from '../components/PlaceInput';
@@ -155,6 +155,7 @@ export async function fetchGeoapifyRoadside(samples: LatLng[]): Promise<Stop[]> 
         visitMin: visitMinutes(cat.kind),
         source: 'geoapify',
         description: describeOsm(raw, cat.kind),
+        parking: parkingFromTags(raw),
         offRouteKm: 0,
         alongKm: 0,
         detourMin: 0,
