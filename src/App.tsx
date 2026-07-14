@@ -7,6 +7,14 @@ import { fetchGeoapifyRoadside, hasGeoapify } from './api/geoapify';
 import type { Stop } from './types';
 import { CATEGORIES, CATEGORY_MAP, thingsToDo, type CategoryId } from './lib/categories';
 import { anyAffiliate, gasCashbackLink, hotelsLink, ticketsLink } from './lib/affiliates';
+import { getThemeMode, setThemeMode, type ThemeMode } from './lib/theme';
+
+const THEME_LABELS: Record<ThemeMode, { icon: string; label: string }> = {
+  auto: { icon: '🌓', label: 'Auto (follows your device)' },
+  dark: { icon: '🌙', label: 'Dark' },
+  light: { icon: '☀️', label: 'Light' },
+};
+const THEME_CYCLE: Record<ThemeMode, ThemeMode> = { auto: 'dark', dark: 'light', light: 'auto' };
 import { cumulativeKm, haversineKm, projectOntoRoute, sampleAlong, simplify, type LatLng } from './lib/geo';
 import { fmtDur } from './lib/format';
 import { MapView } from './MapView';
@@ -94,6 +102,7 @@ export default function App() {
   const [wikiIntros, setWikiIntros] = useState<Record<string, string>>({});
   const [aheadOnly, setAheadOnly] = useState(false);
   const [myAlongKm, setMyAlongKm] = useState<number | null>(null);
+  const [themeMode, setThemeModeState] = useState<ThemeMode>(getThemeMode);
   const routeCalcRef = useRef<{ calcRoute: LatLng[]; cum: number[] } | null>(null);
 
   // Bumped on every new search so a slow response from an old search can't
@@ -337,6 +346,19 @@ export default function App() {
             <h1>
               <span className="brand-icon">🛣️</span> <span className="brand-name">SideQuest</span>
             </h1>
+            <button
+              type="button"
+              className="theme-btn"
+              title={`Theme: ${THEME_LABELS[themeMode].label} — click to change`}
+              aria-label={`Theme: ${THEME_LABELS[themeMode].label} — click to change`}
+              onClick={() => {
+                const next = THEME_CYCLE[themeMode];
+                setThemeModeState(next);
+                setThemeMode(next);
+              }}
+            >
+              {THEME_LABELS[themeMode].icon}
+            </button>
             <p>Fun stops, hidden gems and breaks along your drive</p>
           </header>
 
