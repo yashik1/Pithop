@@ -90,6 +90,45 @@ function shortName(displayName: string): string {
   return displayName.split(',')[0];
 }
 
+// Device position with a friendly, accurate error. Low accuracy + a cached fix
+// is plenty for a route origin and far more reliable than high-accuracy (GPS)
+// requests, which routinely time out on desktops with no GPS chip — the usual
+// cause of "could not get your location" even when permission is granted.
+// Retries once on a transient failure before giving up.
+function getPosition(): Promise<GeolocationPosition> {
+  return new Promise((resolve, reject) => {
+    if (!navigator.geolocation) {
+      reject(new Error('Geolocation is not available in this browser'));
+      return;
+    }
+    const opts: PositionOptions = { enableHighAccuracy: false, timeout: 15000, maximumAge: 300000 };
+    const fail = (err: GeolocationPositionError) => {
+      reject(
+        new Error(
+          err.code === err.PERMISSION_DENIED
+            ? 'Location is blocked for this site — allow it via the location icon in your address bar, then try again'
+            : err.code === err.TIMEOUT
+              ? 'Getting your location timed out — try again, or just type your starting point'
+              : "Couldn't pin down your location right now — try again, or type your starting point",
+        ),
+      );
+    };
+    navigator.geolocation.getCurrentPosition(
+      resolve,
+      (err) => {
+        // "Unavailable"/timeout are often transient — retry once with a fresh
+        // fix. A denied permission won't change on retry, so fail fast.
+        if (err.code !== err.PERMISSION_DENIED) {
+          navigator.geolocation.getCurrentPosition(resolve, fail, { ...opts, maximumAge: 0 });
+        } else {
+          fail(err);
+        }
+      },
+      opts,
+    );
+  });
+}
+
 function normName(name: string): string {
   return name.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
 }
@@ -593,17 +632,13 @@ export default function App() {
   }, [selectedId, wikiIntros]);
 
   function useMyLocation() {
-    if (!navigator.geolocation) {
-      setError('Geolocation is not available in this browser');
-      return;
-    }
-    navigator.geolocation.getCurrentPosition(
+    getPosition().then(
       (pos) => {
+        setError(null);
         setFromText('My location');
         setFromPick({ lat: pos.coords.latitude, lng: pos.coords.longitude });
       },
-      () => setError('Could not get your location — check location permissions'),
-      { enableHighAccuracy: true, timeout: 10000 },
+      (e: Error) => setError(e.message),
     );
   }
 
@@ -614,9 +649,10 @@ export default function App() {
       return;
     }
     const calc = routeCalcRef.current;
-    if (!calc || !navigator.geolocation) return;
-    navigator.geolocation.getCurrentPosition(
+    if (!calc) return;
+    getPosition().then(
       (pos) => {
+        setError(null);
         const proj = projectOntoRoute(
           { lat: pos.coords.latitude, lng: pos.coords.longitude },
           calc.calcRoute,
@@ -625,8 +661,7 @@ export default function App() {
         setMyAlongKm(proj.alongKm);
         setAheadOnly(true);
       },
-      () => setError('Could not get your location — check location permissions'),
-      { enableHighAccuracy: true, timeout: 10000 },
+      (e: Error) => setError(e.message),
     );
   }
 
