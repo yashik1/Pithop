@@ -6,6 +6,7 @@
 import type { LatLng } from '../lib/geo';
 import type { Stop } from '../types';
 import { visitMinutes, type CategoryId } from '../lib/categories';
+import { getAccessToken } from '../lib/auth';
 
 let available: boolean | null = null;
 
@@ -29,6 +30,7 @@ interface CommunityRecord {
   category: CategoryId;
   visitMin?: number;
   parking?: 'free' | 'paid' | 'none';
+  by?: string;
   lat: number;
   lng: number;
 }
@@ -45,6 +47,7 @@ function toStop(r: CommunityRecord): Stop {
     source: 'community',
     description: r.note || undefined,
     parking: r.parking,
+    by: r.by,
     offRouteKm: 0,
     alongKm: 0,
     detourMin: 0,
@@ -74,9 +77,12 @@ export interface CommunitySubmission {
 }
 
 export async function submitCommunityStop(sub: CommunitySubmission): Promise<Stop> {
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  const token = await getAccessToken();
+  if (token) headers.Authorization = `Bearer ${token}`;
   const res = await fetch('/api/community', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers,
     body: JSON.stringify({ action: 'submit', ...sub }),
   });
   const data = await res.json().catch(() => ({}));

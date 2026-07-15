@@ -14,6 +14,8 @@ import type { Stop } from './types';
 import { CATEGORIES, CATEGORY_MAP, thingsToDo, type CategoryId } from './lib/categories';
 import { anyAffiliate, gasCashbackLink, hotelsLink, ticketsLink } from './lib/affiliates';
 import { getThemeMode, setThemeMode, type ThemeMode } from './lib/theme';
+import { getUser, hasAuth, signOut, subscribe, type AuthUser } from './lib/auth';
+import { AuthPanel } from './components/AuthPanel';
 import {
   clearCurrentTrip,
   deleteSavedTrip,
@@ -188,6 +190,7 @@ export default function App() {
   const [addBusy, setAddBusy] = useState(false);
   const [addError, setAddError] = useState<string | null>(null);
   const [locating, setLocating] = useState(false);
+  const [user, setUser] = useState<AuthUser | null>(null);
   const routeCalcRef = useRef<{ calcRoute: LatLng[]; cum: number[] } | null>(null);
 
   // Bumped on every new search so a slow response from an old search can't
@@ -234,6 +237,14 @@ export default function App() {
   // Show the community "Add a place" feature only when the backend exists.
   useEffect(() => {
     void hasCommunity().then(setCommunityOn);
+  }, []);
+
+  // Track sign-in state (community submissions require an account when auth
+  // is configured). No-op when auth isn't set up.
+  useEffect(() => {
+    if (!hasAuth()) return;
+    void getUser().then(setUser);
+    return subscribe(setUser);
   }, []);
 
   // On startup: an opened share link wins over the auto-saved trip. It carries
@@ -772,13 +783,30 @@ export default function App() {
               Pin at {addPin.lat.toFixed(4)}, {addPin.lng.toFixed(4)} — drag the map and tap "Add a place" again to
               move it.
             </p>
-            <input
-              className="add-name"
-              value={addName}
-              maxLength={60}
-              placeholder="Name — e.g. Riverside picnic spot"
-              onChange={(e) => setAddName(e.target.value)}
-            />
+            {hasAuth() && !user ? (
+              <>
+                <AuthPanel />
+                <button type="button" className="add-cancel auth-cancel" onClick={() => setAddPin(null)}>
+                  Cancel
+                </button>
+              </>
+            ) : (
+              <>
+                {user && (
+                  <p className="add-signed">
+                    Signed in as <strong>{user.name}</strong> ·{' '}
+                    <button type="button" className="link-btn" onClick={() => void signOut()}>
+                      Sign out
+                    </button>
+                  </p>
+                )}
+                <input
+                  className="add-name"
+                  value={addName}
+                  maxLength={60}
+                  placeholder="Name — e.g. Riverside picnic spot"
+                  onChange={(e) => setAddName(e.target.value)}
+                />
             <div className="add-row">
               <select value={addCategory} onChange={(e) => setAddCategory(e.target.value as CategoryId)}>
                 {CATEGORIES.map((c) => (
@@ -810,21 +838,26 @@ export default function App() {
               placeholder="What makes it worth the stop? (optional)"
               onChange={(e) => setAddNote(e.target.value)}
             />
-            {addError && <div className="add-error">⚠️ {addError}</div>}
-            <div className="add-actions">
-              <button
-                type="button"
-                className="add-share"
-                disabled={!addName.trim() || addBusy}
-                onClick={() => void shareAddPlace()}
-              >
-                {addBusy ? 'Sharing…' : 'Share with travellers'}
-              </button>
-              <button type="button" className="add-cancel" onClick={() => setAddPin(null)}>
-                Cancel
-              </button>
-            </div>
-            <p className="add-fine">Shared publicly with every user of this app — no account needed.</p>
+                {addError && <div className="add-error">⚠️ {addError}</div>}
+                <div className="add-actions">
+                  <button
+                    type="button"
+                    className="add-share"
+                    disabled={!addName.trim() || addBusy}
+                    onClick={() => void shareAddPlace()}
+                  >
+                    {addBusy ? 'Sharing…' : 'Share with travellers'}
+                  </button>
+                  <button type="button" className="add-cancel" onClick={() => setAddPin(null)}>
+                    Cancel
+                  </button>
+                </div>
+                <p className="add-fine">
+                  Shared publicly with every user of this app
+                  {hasAuth() ? ', credited to your name' : ' — no account needed'}.
+                </p>
+              </>
+            )}
           </div>
         )}
 
@@ -990,6 +1023,7 @@ export default function App() {
                           {s.parking && (
                             <p className={`stop-parking ${s.parking}`}>🅿️ {PARKING_LABEL[s.parking]}</p>
                           )}
+                          {s.source === 'community' && s.by && <p className="stop-by">👤 Added by {s.by}</p>}
                           <div className="stop-links" onClick={(e) => e.stopPropagation()}>
                             {ticketsLink(s.name, s.kind) && (
                               <a className="aff" href={ticketsLink(s.name, s.kind)!} target="_blank" rel="sponsored noreferrer">

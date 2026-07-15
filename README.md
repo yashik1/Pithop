@@ -108,6 +108,27 @@ the project → redeploy. The two env vars are injected automatically
 (`UPSTASH_REDIS_REST_URL` / `UPSTASH_REDIS_REST_TOKEN`; the `KV_*` names also
 work). Without them the endpoint answers 503 and the app hides the feature.
 
+### Require sign-in to add a place (optional)
+
+To make submissions accountable, gate **adding** a place behind an account
+(browsing/reporting stay open). Auth is handled by [Supabase](https://supabase.com/)
+(free tier) — Google and email/password:
+
+1. Create a Supabase project → **Authentication → Providers**: enable **Email**,
+   and **Google** (create a Google OAuth client, paste its id/secret, and add
+   Supabase's callback URL to the Google client's authorized redirect URIs).
+2. Set these env vars in Vercel and redeploy:
+   - `VITE_SUPABASE_URL` / `VITE_SUPABASE_ANON_KEY` (client — the project URL +
+     anon/public key)
+   - `SUPABASE_URL` / `SUPABASE_ANON_KEY` (server — same values; used to verify
+     the signed-in user)
+3. Add your deployed origin under **Authentication → URL Configuration** (Site
+   URL + redirect URLs) so the Google redirect returns to your app.
+
+Submissions are then credited to the contributor's first name + last initial
+("Added by Jane D."). Without these env vars, adding stays anonymous (only the
+IP rate limit applies), so dev and forks keep working.
+
 ## Affiliate links (optional)
 
 Monetization is env-driven and off by default — each button appears only when
