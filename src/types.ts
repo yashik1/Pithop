@@ -14,6 +14,8 @@ export interface Stop {
   wikiUrl?: string;
   // Parking at the spot, when known: free / paid, or 'none' (no on-site parking).
   parking?: 'free' | 'paid' | 'none';
+  // Contributor attribution for community stops ("Jane D.").
+  by?: string;
   offRouteKm: number;
   alongKm: number;
   detourMin: number;

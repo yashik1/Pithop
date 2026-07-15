@@ -43,6 +43,7 @@ function buildPopup(stop: Stop, live: { current: LiveProps }): HTMLElement {
     <div class="p-name"></div>
     ${stop.source === 'community' ? '<div class="p-community">👥 Traveller tip</div>' : ''}
     <div class="p-desc"></div>
+    ${stop.source === 'community' && stop.by ? '<div class="p-by"></div>' : ''}
     <div class="p-meta">${cat.emoji} ${cat.label}</div>
     <div class="p-meta">⏱ ~${fmtDur(stop.visitMin)} visit · 🚗 ~${stop.detourMin} min off route</div>
     ${
@@ -60,6 +61,10 @@ function buildPopup(stop: Stop, live: { current: LiveProps }): HTMLElement {
   if (stop.description) desc.textContent = stop.description;
   else desc.remove();
   div.querySelector('.p-todo')!.textContent = `💡 ${thingsToDo(stop.kind)}`;
+  if (stop.source === 'community' && stop.by) {
+    // textContent (not innerHTML) — the display name is user-controlled.
+    div.querySelector('.p-by')!.textContent = `👤 Added by ${stop.by}`;
+  }
   const btn = div.querySelector<HTMLButtonElement>('.p-add')!;
   btn.textContent = live.current.planIds.has(stop.id) ? '✓ Added — remove' : '+ Add to trip';
   btn.addEventListener('click', () => {

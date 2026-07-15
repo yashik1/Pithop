@@ -29,6 +29,9 @@ interface CommunityRecord {
   lat: number;
   lng: number;
   createdAt: number;
+  // Contributor attribution + moderation id (uid never sent to clients).
+  by?: string;
+  uid?: string;
 }
 
 function getRedis(): Redis | null {
@@ -36,6 +39,37 @@ function getRedis(): Redis | null {
   const token = process.env.UPSTASH_REDIS_REST_TOKEN ?? process.env.KV_REST_API_TOKEN;
   if (!url || !token) return null;
   return new Redis({ url, token });
+}
+
+// First name + initial from the verified identity, for public attribution.
+function attribution(user: any): string {
+  const full: string = (user?.user_metadata?.full_name ?? user?.user_metadata?.name ?? '').trim();
+  if (full) {
+    const parts = full.split(/\s+/);
+    return parts.length > 1 ? `${parts[0]} ${parts[parts.length - 1][0].toUpperCase()}.` : parts[0];
+  }
+  const local = String(user?.email ?? '').split('@')[0];
+  return local ? local.charAt(0).toUpperCase() + local.slice(1) : 'Traveller';
+}
+
+const AUTH_ENABLED = Boolean(process.env.SUPABASE_URL && process.env.SUPABASE_ANON_KEY);
+
+// Verify a Supabase access token by asking Supabase who it belongs to. Returns
+// null on any failure. No server SDK needed — one authenticated GET.
+async function verifyUser(authHeader: string | undefined): Promise<{ uid: string; by: string } | null> {
+  const token = /^Bearer (.+)$/.exec(authHeader ?? '')?.[1];
+  if (!token) return null;
+  try {
+    const res = await fetch(`${process.env.SUPABASE_URL}/auth/v1/user`, {
+      headers: { Authorization: `Bearer ${token}`, apikey: process.env.SUPABASE_ANON_KEY as string },
+    });
+    if (!res.ok) return null;
+    const user = await res.json();
+    if (!user?.id) return null;
+    return { uid: String(user.id), by: attribution(user) };
+  } catch {
+    return null;
+  }
 }
 
 function haversineKm(lat1: number, lng1: number, lat2: number, lng2: number): number {
@@ -84,13 +118,14 @@ export default async function handler(req: any, res: any) {
         redis.hgetall<Record<string, unknown>>(STOPS_KEY),
         redis.hgetall<Record<string, number>>(REPORTS_KEY),
       ]);
-      const out: Array<CommunityRecord & { id: string }> = [];
+      const out: Array<Omit<CommunityRecord, 'uid'> & { id: string }> = [];
       for (const [id, val] of Object.entries(stops ?? {})) {
         if (Number(reports?.[id] ?? 0) >= HIDE_AT_REPORTS) continue;
         const rec = parseRecord(val);
         if (!rec) continue;
         if (points.some(([lat, lng]: number[]) => haversineKm(lat, lng, rec.lat, rec.lng) <= RADIUS_KM)) {
-          out.push({ id, ...rec });
+          const { uid: _uid, ...pub } = rec; // never expose the contributor's uid
+          out.push({ id, ...pub });
           if (out.length >= MAX_RESULTS) break;
         }
       }
@@ -147,8 +182,19 @@ export default async function handler(req: any, res: any) {
     }
     const parking = PARKING_OPTIONS.includes(body.parking) ? body.parking : undefined;
 
+    // When auth is configured, adding requires a valid signed-in account.
+    let account: { uid: string; by: string } | null = null;
+    if (AUTH_ENABLED) {
+      account = await verifyUser(req.headers?.authorization);
+      if (!account) {
+        res.status(401).json({ error: 'Please sign in to add a place' });
+        return;
+      }
+    }
+
+    // Rate-limit per account when signed in, else per IP.
     const ip = String(req.headers?.['x-forwarded-for'] ?? 'unknown').split(',')[0].trim() || 'unknown';
-    const rlKey = `community:rl:${ip}`;
+    const rlKey = `community:rl:${account ? `u:${account.uid}` : ip}`;
     const n = await redis.incr(rlKey);
     if (n === 1) await redis.expire(rlKey, 86400);
     if (n > DAILY_SUBMISSIONS_PER_IP) {
@@ -157,9 +203,22 @@ export default async function handler(req: any, res: any) {
     }
 
     const id = `cs_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
-    const record: CommunityRecord = { name, note, category, visitMin, parking, lat, lng, createdAt: Date.now() };
+    const record: CommunityRecord = {
+      name,
+      note,
+      category,
+      visitMin,
+      parking,
+      lat,
+      lng,
+      createdAt: Date.now(),
+      by: account?.by,
+      uid: account?.uid,
+    };
     await redis.hset(STOPS_KEY, { [id]: JSON.stringify(record) });
-    res.status(200).json({ stop: { id, ...record } });
+    // Never leak uid to clients.
+    const { uid: _uid, ...publicRecord } = record;
+    res.status(200).json({ stop: { id, ...publicRecord } });
     return;
   }
 

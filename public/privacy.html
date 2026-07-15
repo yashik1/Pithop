@@ -109,9 +109,16 @@
         If you use <strong>“📍 Add a place”</strong>, the place you submit — its name, optional note, category,
         suggested visit time and map coordinates — is stored in our database and shown
         <strong>publicly to every user</strong> of the app. Don't include personal information in names or notes.
-        Submissions are not tied to an account; we keep a short-lived, IP-based counter solely to limit spam
-        (10 submissions per day). Places reported by several users are hidden automatically. To request removal of
-        a submission, contact us (below).
+        Places reported by several users are hidden automatically. To request removal of a submission, contact us
+        (below).
+      </p>
+      <p>
+        <strong>Signing in:</strong> when sign-in is enabled, adding a place requires an account (Google or
+        email/password), handled by <a href="https://supabase.com/">Supabase Auth</a>. This keeps contributions
+        accountable. We store your account's user id (for spam-limiting and moderation) and a short display name —
+        <strong>your first name and last initial</strong> — which is shown publicly as the contributor
+        (“Added by Jane D.”). Your email address is used only for authentication and is never shown to other users
+        or attached to a place. Browsing and reporting never require an account.
       </p>
 
       <h2>Services we rely on</h2>
@@ -139,6 +146,10 @@
         <tr>
           <td>Community places database</td>
           <td><a href="https://upstash.com/">Upstash</a> (stores only the submitted place data described above)</td>
+        </tr>
+        <tr>
+          <td>Sign-in (to add a place)</td>
+          <td><a href="https://supabase.com/">Supabase Auth</a> (Google / email accounts; used only when enabled)</td>
         </tr>
         <tr>
           <td>Navigation links</td>
