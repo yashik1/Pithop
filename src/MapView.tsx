@@ -5,6 +5,7 @@ import type { Stop } from './types';
 import { CATEGORY_MAP, thingsToDo } from './lib/categories';
 import { fmtDur } from './lib/format';
 import { geoapifyTileLayer, hasGeoapify } from './api/geoapify';
+import { catLabel, t, type Lang } from './lib/i18n';
 
 interface Props {
   route: RouteResult | null;
@@ -18,6 +19,7 @@ interface Props {
   onToggleAdd: () => void;
   onPickPoint: (p: { lat: number; lng: number }) => void;
   pinPreview: { lat: number; lng: number } | null;
+  lang: Lang;
 }
 
 interface LiveProps {
@@ -41,20 +43,20 @@ function buildPopup(stop: Stop, live: { current: LiveProps }): HTMLElement {
   div.innerHTML = `
     ${img}
     <div class="p-name"></div>
-    ${stop.source === 'community' ? '<div class="p-community">👥 Traveller tip</div>' : ''}
+    ${stop.source === 'community' ? `<div class="p-community">👥 ${t('travellerTip')}</div>` : ''}
     <div class="p-desc"></div>
     ${stop.source === 'community' && stop.by ? '<div class="p-by"></div>' : ''}
-    <div class="p-meta">${cat.emoji} ${cat.label}</div>
-    <div class="p-meta">⏱ ~${fmtDur(stop.visitMin)} visit · 🚗 ~${stop.detourMin} min off route</div>
+    <div class="p-meta">${cat.emoji} ${catLabel(stop.category)}</div>
+    <div class="p-meta">⏱ ~${fmtDur(stop.visitMin)} · 🚗 ~${stop.detourMin} min</div>
     ${
       stop.parking
         ? `<div class="p-meta">🅿️ ${
-            stop.parking === 'free' ? 'Free parking' : stop.parking === 'paid' ? 'Paid parking' : 'No parking on site'
+            stop.parking === 'free' ? t('parkFree') : stop.parking === 'paid' ? t('parkPaid') : t('parkNone')
           }</div>`
         : ''
     }
     <div class="p-todo"></div>
-    <div class="p-links"><a class="p-link" href="${gmaps}" target="_blank" rel="noreferrer">Open in Google Maps ↗</a>${wiki}</div>
+    <div class="p-links"><a class="p-link" href="${gmaps}" target="_blank" rel="noreferrer">Google Maps ↗</a>${wiki}</div>
     <button type="button" class="p-add"></button>`;
   div.querySelector('.p-name')!.textContent = stop.name;
   const desc = div.querySelector<HTMLElement>('.p-desc')!;
@@ -63,14 +65,14 @@ function buildPopup(stop: Stop, live: { current: LiveProps }): HTMLElement {
   div.querySelector('.p-todo')!.textContent = `💡 ${thingsToDo(stop.kind)}`;
   if (stop.source === 'community' && stop.by) {
     // textContent (not innerHTML) — the display name is user-controlled.
-    div.querySelector('.p-by')!.textContent = `👤 Added by ${stop.by}`;
+    div.querySelector('.p-by')!.textContent = `👤 ${t('addedBy', { name: stop.by })}`;
   }
   const btn = div.querySelector<HTMLButtonElement>('.p-add')!;
-  btn.textContent = live.current.planIds.has(stop.id) ? '✓ Added — remove' : '+ Add to trip';
+  btn.textContent = live.current.planIds.has(stop.id) ? `✓ ${t('removeFromTrip')}` : `+ ${t('addToTrip')}`;
   btn.addEventListener('click', () => {
     const wasInPlan = live.current.planIds.has(stop.id);
     live.current.onTogglePlan(stop.id);
-    btn.textContent = wasInPlan ? '+ Add to trip' : '✓ Added — remove';
+    btn.textContent = wasInPlan ? `+ ${t('addToTrip')}` : `✓ ${t('removeFromTrip')}`;
   });
   return div;
 }
@@ -87,7 +89,9 @@ export function MapView({
   onToggleAdd,
   onPickPoint,
   pinPreview,
+  lang,
 }: Props) {
+  void lang; // re-render markers/labels when the language changes
   const divRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
   const routeLayerRef = useRef<L.LayerGroup | null>(null);
@@ -208,7 +212,7 @@ export function MapView({
       <div ref={divRef} className="map-canvas" />
       {communityOn && (
         <button type="button" className={`map-add${addArmed ? ' armed' : ''}`} onClick={onToggleAdd}>
-          {addArmed ? 'Tap the map where the place is — or cancel ✕' : '📍 Add a place'}
+          {addArmed ? t('addPlaceArmed') : `📍 ${t('addPlace')}`}
         </button>
       )}
     </div>

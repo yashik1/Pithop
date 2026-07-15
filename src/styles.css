@@ -129,6 +129,12 @@ body {
   height: 100%;
 }
 
+/* Right-to-left languages (Arabic): put the sidebar on the right on desktop;
+   text direction is handled by the html[dir] attribute. */
+:root[dir='rtl'] .app {
+  flex-direction: row-reverse;
+}
+
 .sidebar {
   position: relative;
   z-index: 1;
@@ -204,17 +210,42 @@ body {
 
 .brand {
   position: relative;
-  padding: 22px 136px 10px 20px;
+  padding: 22px 20px 10px;
   color: #fff;
 }
 
+.brand-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px 12px;
+  flex-wrap: wrap;
+}
+
 .head-tools {
-  position: absolute;
-  top: 22px;
-  right: 16px;
   display: flex;
   align-items: center;
   gap: 8px;
+}
+
+.lang-select {
+  height: 36px;
+  max-width: 108px;
+  padding: 0 8px;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.16);
+  color: #fff;
+  font-family: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+/* Native dropdown list needs readable colors in both themes. */
+.lang-select option {
+  color: var(--ink);
+  background: var(--card);
 }
 
 .units-toggle {
