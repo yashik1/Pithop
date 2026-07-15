@@ -2184,6 +2184,32 @@ body {
   color: var(--ink-2);
 }
 
+/* Persistent signed-in status under the hero. */
+.signed-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin: 12px 14px 0;
+  padding: 8px 13px;
+  font-size: 12.5px;
+  color: #05603f;
+  background: linear-gradient(180deg, #eefcf4, #e5f8ee);
+  border: 1px solid #bfe8d2;
+  border-radius: var(--r-md);
+  animation: rise-in 0.3s var(--ease-out) backwards;
+}
+
+.signed-bar strong {
+  font-weight: 700;
+}
+
+:root[data-theme='dark'] .signed-bar {
+  color: #8fe6bb;
+  background: #122b1e;
+  border-color: #1f4a34;
+}
+
 /* Contributor attribution on a community stop. */
 .stop-by {
   margin: 8px 0 0;
