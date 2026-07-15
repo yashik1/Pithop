@@ -9,8 +9,13 @@
 
 import type { SupabaseClient, User } from '@supabase/supabase-js';
 
-const URL = ((import.meta.env.VITE_SUPABASE_URL as string | undefined) ?? '').trim();
-const ANON = ((import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined) ?? '').trim();
+// Strip ALL whitespace, not just the ends: env values pasted from a dashboard
+// often pick up a stray newline mid-string (the key wraps in the UI), and an
+// invalid character in the Supabase `apikey` header makes fetch throw
+// "Failed to execute 'fetch' on 'Window': Invalid value". URLs and API keys
+// never legitimately contain whitespace, so this is safe.
+const URL = ((import.meta.env.VITE_SUPABASE_URL as string | undefined) ?? '').replace(/\s+/g, '');
+const ANON = ((import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined) ?? '').replace(/\s+/g, '');
 
 export function hasAuth(): boolean {
   return Boolean(URL && ANON);

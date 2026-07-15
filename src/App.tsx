@@ -773,6 +773,17 @@ export default function App() {
           </form>
         </div>
 
+        {hasAuth() && user && (
+          <div className="signed-bar">
+            <span>
+              ✓ Signed in as <strong>{user.name}</strong>
+            </span>
+            <button type="button" className="link-btn" onClick={() => void signOut()}>
+              Sign out
+            </button>
+          </div>
+        )}
+
         {error && <div className="error">⚠️ {error}</div>}
         {notice && !busy && <div className="notice">ℹ️ {notice}</div>}
 
