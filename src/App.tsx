@@ -16,6 +16,7 @@ import { anyAffiliate, gasCashbackLink, hotelsLink, ticketsLink } from './lib/af
 import { getThemeMode, setThemeMode, type ThemeMode } from './lib/theme';
 import { getUser, hasAuth, signOut, subscribe, type AuthUser } from './lib/auth';
 import { AuthPanel } from './components/AuthPanel';
+import { catLabel, getLang, LANGUAGES, setLang, t, type Lang } from './lib/i18n';
 import {
   clearCurrentTrip,
   deleteSavedTrip,
@@ -35,10 +36,10 @@ const THEME_LABELS: Record<ThemeMode, { icon: string; label: string }> = {
 };
 const THEME_CYCLE: Record<ThemeMode, ThemeMode> = { auto: 'dark', dark: 'light', light: 'auto' };
 
-const PARKING_LABEL: Record<'free' | 'paid' | 'none', string> = {
-  free: 'Free parking',
-  paid: 'Paid parking',
-  none: 'No parking on site',
+const PARKING_KEY: Record<'free' | 'paid' | 'none', 'parkFree' | 'parkPaid' | 'parkNone'> = {
+  free: 'parkFree',
+  paid: 'parkPaid',
+  none: 'parkNone',
 };
 
 // Decode a shared trip from location.hash (#trip=<base64>). Returns the route
@@ -79,12 +80,12 @@ import { MapView } from './MapView';
 import { PlaceInput } from './components/PlaceInput';
 
 const DETOUR_OPTIONS = [5, 10, 15, 25, 40];
-const VISIT_OPTIONS = [
-  { label: 'Quick stop (≤ 15 min)', max: 15 },
-  { label: 'Short (≤ 30 min)', max: 30 },
-  { label: 'Up to 1 hour', max: 60 },
-  { label: 'Up to 2 hours', max: 120 },
-  { label: 'Any length', max: 9999 },
+const VISIT_OPTIONS: Array<{ key: 'visitQuick' | 'visitShort' | 'visit1h' | 'visit2h' | 'visitAny'; max: number }> = [
+  { key: 'visitQuick', max: 15 },
+  { key: 'visitShort', max: 30 },
+  { key: 'visit1h', max: 60 },
+  { key: 'visit2h', max: 120 },
+  { key: 'visitAny', max: 9999 },
 ];
 const LIST_CAP = 250;
 
@@ -177,6 +178,7 @@ export default function App() {
   const [myAlongKm, setMyAlongKm] = useState<number | null>(null);
   const [themeMode, setThemeModeState] = useState<ThemeMode>(getThemeMode);
   const [units, setUnitsState] = useState<Units>(getUnits);
+  const [lang, setLangState] = useState<Lang>(getLang);
   const [savedTrips, setSavedTrips] = useState<StoredTrip[]>(listSavedTrips);
   // Community places: shared with all users via the optional backend.
   const [communityOn, setCommunityOn] = useState(false);
@@ -687,10 +689,27 @@ export default function App() {
       <aside className="sidebar">
         <div className="hero">
           <header className="brand">
+            <div className="brand-top">
             <h1>
               <span className="brand-icon">🛣️</span> <span className="brand-name">SideQuest</span>
             </h1>
             <div className="head-tools">
+              <select
+                className="lang-select"
+                aria-label={t('language')}
+                value={lang}
+                onChange={(e) => {
+                  const next = e.target.value as Lang;
+                  setLang(next);
+                  setLangState(next);
+                }}
+              >
+                {LANGUAGES.map((l) => (
+                  <option key={l.code} value={l.code}>
+                    {l.name}
+                  </option>
+                ))}
+              </select>
               <div className="units-toggle" role="group" aria-label="Distance units">
                 {(['km', 'mi'] as Units[]).map((u) => (
                   <button
@@ -721,7 +740,8 @@ export default function App() {
                 {THEME_LABELS[themeMode].icon}
               </button>
             </div>
-            <p>Fun stops, hidden gems and breaks along your drive</p>
+            </div>
+            <p>{t('tagline')}</p>
           </header>
 
           <form
@@ -734,7 +754,7 @@ export default function App() {
             <div className="from-row">
               <PlaceInput
                 value={fromText}
-                placeholder="From — city, address or 📍"
+                placeholder={`${t('fromPh')} 📍`}
                 onChange={(t) => {
                   setFromText(t);
                   setFromPick(null);
@@ -757,7 +777,7 @@ export default function App() {
             </div>
             <PlaceInput
               value={toText}
-              placeholder="To — city or address"
+              placeholder={t('toPh')}
               onChange={(t) => {
                 setToText(t);
                 setToPick(null);
@@ -768,7 +788,7 @@ export default function App() {
               }}
             />
             <button type="submit" className={`go-btn${busy ? ' busy' : ''}`} disabled={!!busy || !fromText.trim() || !toText.trim()}>
-              {busy ?? 'Find stops along the way'}
+              {busy ?? t('find')}
             </button>
           </form>
         </div>
@@ -776,10 +796,10 @@ export default function App() {
         {hasAuth() && user && (
           <div className="signed-bar">
             <span>
-              ✓ Signed in as <strong>{user.name}</strong>
+              ✓ {t('signedInAs')} <strong>{user.name}</strong>
             </span>
             <button type="button" className="link-btn" onClick={() => void signOut()}>
-              Sign out
+              {t('signOut')}
             </button>
           </div>
         )}
@@ -789,7 +809,7 @@ export default function App() {
 
         {addPin && (
           <div className="add-place">
-            <h2>📍 Share a place with all travellers</h2>
+            <h2>📍 {t('shareTitle')}</h2>
             <p className="add-coords">
               Pin at {addPin.lat.toFixed(4)}, {addPin.lng.toFixed(4)} — drag the map and tap "Add a place" again to
               move it.
@@ -798,16 +818,16 @@ export default function App() {
               <>
                 <AuthPanel />
                 <button type="button" className="add-cancel auth-cancel" onClick={() => setAddPin(null)}>
-                  Cancel
+                  {t('cancel')}
                 </button>
               </>
             ) : (
               <>
                 {user && (
                   <p className="add-signed">
-                    Signed in as <strong>{user.name}</strong> ·{' '}
+                    {t('signedInAs')} <strong>{user.name}</strong> ·{' '}
                     <button type="button" className="link-btn" onClick={() => void signOut()}>
-                      Sign out
+                      {t('signOut')}
                     </button>
                   </p>
                 )}
@@ -815,7 +835,7 @@ export default function App() {
                   className="add-name"
                   value={addName}
                   maxLength={60}
-                  placeholder="Name — e.g. Riverside picnic spot"
+                  placeholder={t('namePh')}
                   onChange={(e) => setAddName(e.target.value)}
                 />
             <div className="add-row">
@@ -838,15 +858,15 @@ export default function App() {
               value={addParking}
               onChange={(e) => setAddParking(e.target.value as typeof addParking)}
             >
-              <option value="">🅿️ Parking? (optional)</option>
-              <option value="free">🅿️ Free parking</option>
-              <option value="paid">🅿️ Paid parking</option>
-              <option value="none">🅿️ No parking on site</option>
+              <option value="">🅿️ {t('parkingQ')}</option>
+              <option value="free">🅿️ {t('parkFree')}</option>
+              <option value="paid">🅿️ {t('parkPaid')}</option>
+              <option value="none">🅿️ {t('parkNone')}</option>
             </select>
             <textarea
               value={addNote}
               maxLength={200}
-              placeholder="What makes it worth the stop? (optional)"
+              placeholder={t('notePh')}
               onChange={(e) => setAddNote(e.target.value)}
             />
                 {addError && <div className="add-error">⚠️ {addError}</div>}
@@ -857,7 +877,7 @@ export default function App() {
                     disabled={!addName.trim() || addBusy}
                     onClick={() => void shareAddPlace()}
                   >
-                    {addBusy ? 'Sharing…' : 'Share with travellers'}
+                    {addBusy ? t('sharing') : t('shareBtn')}
                   </button>
                   <button type="button" className="add-cancel" onClick={() => setAddPin(null)}>
                     Cancel
@@ -876,15 +896,16 @@ export default function App() {
           <div className="summary">
             <div className="summary-actions">
               <button type="button" className="summary-save" title="Save this trip with all its stops" onClick={handleSaveTrip}>
-                💾 Save
+                💾 {t('save')}
               </button>
               <button type="button" className="summary-clear" title="Clear this trip" onClick={clearTrip}>
-                ✕ Clear
+                ✕ {t('clear')}
               </button>
             </div>
             <div className="summary-route">{routeLabel}</div>
             <div className="summary-stats">
-              {fmtDist(route.distanceKm, units)} · {fmtDur(route.durationMin)} drive · {stops.length} stops found
+              {fmtDist(route.distanceKm, units)} · {fmtDur(route.durationMin)} {t('drive')} ·{' '}
+              {t('stopsFound', { n: stops.length })}
             </div>
             {(() => {
               const dest = routeLabel.split('→')[1]?.trim();
@@ -904,7 +925,7 @@ export default function App() {
             {stops.length > 0 && (
               <label className="ahead">
                 <input type="checkbox" checked={aheadOnly} onChange={toggleAhead} />
-                On the road: only stops ahead of me (next {units === 'mi' ? '50 mi' : '80 km'})
+                {t('aheadLabel')} ({units === 'mi' ? '50 mi' : '80 km'})
                 {aheadOnly && myAlongKm !== null && (
                   <span className="ahead-pos"> — you're at {fmtDist(myAlongKm, units)}</span>
                 )}
@@ -926,10 +947,10 @@ export default function App() {
                       className={`chip${active ? ' active' : ''}`}
                       style={active ? { background: c.color, borderColor: c.color } : undefined}
                       aria-pressed={active}
-                      aria-label={`${c.label} filter, ${catCounts[c.id] ?? 0} stops`}
+                      aria-label={`${catLabel(c.id)} filter, ${catCounts[c.id] ?? 0} stops`}
                       onClick={() => toggleCat(c.id)}
                     >
-                      {c.emoji} {c.label}
+                      {c.emoji} {catLabel(c.id)}
                       <span className="chip-count">{catCounts[c.id] ?? 0}</span>
                     </button>
                   );
@@ -937,7 +958,7 @@ export default function App() {
               </div>
               <div className="selects">
                 <label>
-                  Max detour
+                  {t('maxDetour')}
                   <select value={maxDetour} onChange={(e) => setMaxDetour(Number(e.target.value))}>
                     {DETOUR_OPTIONS.map((d) => (
                       <option key={d} value={d}>
@@ -947,11 +968,11 @@ export default function App() {
                   </select>
                 </label>
                 <label>
-                  Time to spend
+                  {t('timeToSpend')}
                   <select value={maxVisit} onChange={(e) => setMaxVisit(Number(e.target.value))}>
                     {VISIT_OPTIONS.map((v) => (
                       <option key={v.max} value={v.max}>
-                        {v.label}
+                        {t(v.key)}
                       </option>
                     ))}
                   </select>
@@ -961,7 +982,7 @@ export default function App() {
 
             {plan.length > 0 && (
               <div className="plan">
-                <h2>Your stops ({plan.length})</h2>
+                <h2>{t('yourStops', { n: plan.length })}</h2>
                 {plan.map((s) => (
                   <div key={s.id} className="plan-item">
                     <button type="button" className="plan-name" onClick={() => setSelectedId(s.id)}>
@@ -980,10 +1001,10 @@ export default function App() {
                 ))}
                 <div className="plan-cta">
                   <button type="button" className="plan-nav" onClick={navigateTrip}>
-                    🧭 Start trip in Google Maps
+                    🧭 {t('startTrip')}
                   </button>
                   <button type="button" className="plan-share" onClick={() => void shareTrip()}>
-                    🔗 Share
+                    🔗 {t('share')}
                   </button>
                 </div>
               </div>
@@ -1021,8 +1042,8 @@ export default function App() {
                     <div className="stop-body">
                       <div className="stop-name">{s.name}</div>
                       <div className="stop-meta">
-                        {s.source === 'community' ? '👥 Traveller tip · ' : ''}
-                        {c.label} · ⏱ {fmtDur(s.visitMin)} · 🚗 {s.detourMin} min detour · at{' '}
+                        {s.source === 'community' ? `👥 ${t('travellerTip')} · ` : ''}
+                        {catLabel(s.category)} · ⏱ {fmtDur(s.visitMin)} · 🚗 {s.detourMin} min · at{' '}
                         {distValue(s.alongKm, units)} {units}
                       </div>
                       {s.description && <div className="stop-desc">{s.description}</div>}
@@ -1032,18 +1053,20 @@ export default function App() {
                           {intro && intro !== s.description && <p className="stop-intro">{intro}</p>}
                           <p className="stop-todo">💡 {thingsToDo(s.kind)}</p>
                           {s.parking && (
-                            <p className={`stop-parking ${s.parking}`}>🅿️ {PARKING_LABEL[s.parking]}</p>
+                            <p className={`stop-parking ${s.parking}`}>🅿️ {t(PARKING_KEY[s.parking])}</p>
                           )}
-                          {s.source === 'community' && s.by && <p className="stop-by">👤 Added by {s.by}</p>}
+                          {s.source === 'community' && s.by && (
+                            <p className="stop-by">👤 {t('addedBy', { name: s.by })}</p>
+                          )}
                           <div className="stop-links" onClick={(e) => e.stopPropagation()}>
                             {ticketsLink(s.name, s.kind) && (
                               <a className="aff" href={ticketsLink(s.name, s.kind)!} target="_blank" rel="sponsored noreferrer">
-                                🎟️ Book tickets ↗
+                                🎟️ {t('bookTickets')} ↗
                               </a>
                             )}
                             {s.category === 'rest' && gasCashbackLink() && (
                               <a className="aff" href={gasCashbackLink()!} target="_blank" rel="sponsored noreferrer">
-                                ⛽ Gas cash back ↗
+                                ⛽ {t('gasCashback')} ↗
                               </a>
                             )}
                             {s.wikiUrl && (
@@ -1060,7 +1083,7 @@ export default function App() {
                             </a>
                             {s.source === 'community' && (
                               <button type="button" className="report-btn" onClick={() => void handleReport(s)}>
-                                🚩 Report
+                                🚩 {t('report')}
                               </button>
                             )}
                           </div>
@@ -1070,8 +1093,8 @@ export default function App() {
                     <button
                       type="button"
                       className={`add-btn${added ? ' added' : ''}`}
-                      title={added ? 'Remove from trip' : 'Add to trip'}
-                      aria-label={added ? `Remove ${s.name} from trip` : `Add ${s.name} to trip`}
+                      title={added ? t('removeFromTrip') : t('addToTrip')}
+                      aria-label={added ? `${t('removeFromTrip')}: ${s.name}` : `${t('addToTrip')}: ${s.name}`}
                       aria-pressed={added}
                       onClick={(e) => {
                         e.stopPropagation();
@@ -1089,7 +1112,7 @@ export default function App() {
 
         {!route && !busy && savedTrips.length > 0 && (
           <div className="trips">
-            <h2>💾 Saved trips</h2>
+            <h2>💾 {t('savedTrips')}</h2>
             {savedTrips.map((t) => (
               <div key={t.id} className="trip-item">
                 <button type="button" className="trip-load" onClick={() => handleLoadTrip(t)}>
@@ -1114,13 +1137,9 @@ export default function App() {
 
         {!route && !busy && !error && (
           <div className="hint">
-            <p>
-              Enter where you're driving from and to. SideQuest maps your route and finds viewpoints, quirky
-              attractions, nature, history and food along the way — with how far off your route each stop is and how
-              long you'd spend there.
-            </p>
+            <p>{t('hintBody')}</p>
             <p className="hint-example">
-              Try:{' '}
+              {t('tryLabel')}{' '}
               <button
                 type="button"
                 onClick={() => {
@@ -1160,6 +1179,7 @@ export default function App() {
         }}
         onPickPoint={pickAddPoint}
         pinPreview={addPin}
+        lang={lang}
       />
     </div>
   );

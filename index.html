@@ -9,12 +9,15 @@
     <link rel="manifest" href="/manifest.webmanifest" />
     <title>SideQuest — fun stops on long drives</title>
     <script>
-      // Apply the stored theme before first paint to avoid a flash.
+      // Apply the stored theme + language direction before first paint.
       try {
         var m = localStorage.getItem('sq-theme');
         var dark =
           m === 'dark' || ((m === null || m === 'auto') && matchMedia('(prefers-color-scheme: dark)').matches);
         document.documentElement.dataset.theme = dark ? 'dark' : 'light';
+        var lang = localStorage.getItem('sq-lang') || (navigator.language || 'en').slice(0, 2);
+        var rtl = ['ar', 'he', 'fa', 'ur'];
+        if (rtl.indexOf(lang) !== -1) document.documentElement.dir = 'rtl';
       } catch (e) {}
     </script>
     <style>

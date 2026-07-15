@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { signInWithEmail, signInWithGoogle, signUpWithEmail } from '../lib/auth';
+import { t } from '../lib/i18n';
 
 // Sign-in gate shown inside the add-place card when adding requires an account.
 // Google (redirect) plus email/password with a sign-in ⇄ create-account toggle.
@@ -34,32 +35,32 @@ export function AuthPanel() {
 
   return (
     <div className="auth-panel">
-      <p className="auth-intro">Sign in to add a place — it keeps community spots trustworthy.</p>
+      <p className="auth-intro">{t('signInPrompt')}</p>
       <button type="button" className="auth-google" onClick={() => void signInWithGoogle()}>
-        <span className="auth-g">G</span> Continue with Google
+        <span className="auth-g">G</span> {t('continueGoogle')}
       </button>
       <div className="auth-or">
-        <span>or</span>
+        <span>{t('orSep')}</span>
       </div>
       <form onSubmit={submit}>
         <input
           type="email"
           autoComplete="email"
-          placeholder="Email"
+          placeholder={t('email')}
           value={email}
           onChange={(e) => setEmail(e.target.value)}
         />
         <input
           type="password"
           autoComplete={mode === 'in' ? 'current-password' : 'new-password'}
-          placeholder={mode === 'in' ? 'Password' : 'Create a password'}
+          placeholder={mode === 'in' ? t('password') : t('passwordNew')}
           value={password}
           onChange={(e) => setPassword(e.target.value)}
         />
         {error && <div className="auth-error">⚠️ {error}</div>}
         {info && <div className="auth-info">✉️ {info}</div>}
         <button type="submit" className="auth-submit" disabled={busy || !email.trim() || !password}>
-          {busy ? 'Working…' : mode === 'in' ? 'Sign in' : 'Create account'}
+          {busy ? '…' : mode === 'in' ? t('signIn') : t('createAccount')}
         </button>
       </form>
       <button
@@ -71,7 +72,7 @@ export function AuthPanel() {
           setInfo(null);
         }}
       >
-        {mode === 'in' ? 'New here? Create an account' : 'Have an account? Sign in'}
+        {mode === 'in' ? t('newHere') : t('haveAccount')}
       </button>
     </div>
   );
