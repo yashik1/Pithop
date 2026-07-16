@@ -177,7 +177,8 @@ const RULE_REGEXES = RULES.map((rule) => ({
 }));
 
 function categorizeWiki(title: string, description: string | undefined): { category: CategoryId; kind: string } | null {
-  const desc = (description ?? '').toLowerCase();
+  title = String(title ?? '');
+  const desc = String(description ?? '').toLowerCase();
   if (BLACKLIST.some((b) => desc.includes(b))) return null;
   const text = `${title.toLowerCase()} ${desc}`;
   for (const rule of RULE_REGEXES) {

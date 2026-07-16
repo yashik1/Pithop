@@ -133,8 +133,14 @@ function getPosition(): Promise<GeolocationPosition> {
   });
 }
 
-function normName(name: string): string {
-  return name.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+// Defensive String(): a rare POI can arrive with a non-string name (e.g. a
+// purely numeric OSM name), and this runs over every stop from every source —
+// it must never throw ("e.toLowerCase is not a function" killed whole searches).
+function normName(name: unknown): string {
+  return String(name ?? '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim();
 }
 
 // Wikipedia stops win on collisions — they carry descriptions, photos and links.
@@ -494,6 +500,9 @@ export default function App() {
       routeCalcRef.current = { calcRoute, cum };
       const enrich = (raw: Stop[]) =>
         raw
+          // One malformed POI must never sink the whole result set.
+          .filter((s) => s && s.name != null && Number.isFinite(s.lat) && Number.isFinite(s.lng))
+          .map((s) => (typeof s.name === 'string' ? s : { ...s, name: String(s.name) }))
           .map((s) => {
             const proj = projectOntoRoute({ lat: s.lat, lng: s.lng }, calcRoute, cum);
             return {

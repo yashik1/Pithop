@@ -103,24 +103,27 @@ export function describeOsm(tags: Record<string, string>, kind: string): string 
 }
 
 function categorizeOsm(tags: Record<string, string>): { category: CategoryId; kind: string; name: string } | null {
+  // Coerce tag values — OSM data occasionally yields non-string names, which
+  // must not crash string handling downstream.
+  const tagName = tags.name != null ? String(tags.name) : undefined;
   if (tags.tourism === 'viewpoint') {
-    return { category: 'views', kind: 'viewpoint', name: tags.name ?? 'Scenic viewpoint' };
+    return { category: 'views', kind: 'viewpoint', name: tagName ?? 'Scenic viewpoint' };
   }
-  if (tags.amenity && FOOD_KINDS.includes(tags.amenity) && tags.name) {
-    return { category: 'food', kind: tags.amenity, name: tags.name };
+  if (tags.amenity && FOOD_KINDS.includes(tags.amenity) && tagName) {
+    return { category: 'food', kind: tags.amenity, name: tagName };
   }
   if (tags.highway === 'rest_area' || tags.highway === 'services') {
     return {
       category: 'rest',
       kind: tags.highway,
-      name: tags.name ?? (tags.highway === 'services' ? 'Service area' : 'Rest area'),
+      name: tagName ?? (tags.highway === 'services' ? 'Service area' : 'Rest area'),
     };
   }
   if (tags.amenity === 'fuel') {
-    return { category: 'rest', kind: 'fuel', name: tags.name ?? tags.brand ?? 'Fuel station' };
+    return { category: 'rest', kind: 'fuel', name: tagName ?? (tags.brand != null ? String(tags.brand) : 'Fuel station') };
   }
   if (tags.amenity === 'toilets') {
-    return { category: 'rest', kind: 'toilets', name: tags.name ?? 'Public restrooms' };
+    return { category: 'rest', kind: 'toilets', name: tagName ?? 'Public restrooms' };
   }
   return null;
 }
