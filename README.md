@@ -1,6 +1,6 @@
-# 🛣️ SideQuest — fun stops on long drives
+# 🛣️ Pithop — fun stops on long drives
 
-Enter where you're driving from and to. SideQuest maps your route and finds
+Enter where you're driving from and to. Pithop maps your route and finds
 viewpoints, quirky attractions, nature, history, museums, food and rest stops
 along a corridor around it — each with an **estimated visit time** and an
 **estimated detour** off your route. Filter by category, max detour, and how

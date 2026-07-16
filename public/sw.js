@@ -3,8 +3,8 @@
 // immutable). Map tiles and place photos are cached cache-first (capped) so a
 // trip planned online keeps its map imagery when the signal drops. Data APIs
 // are never cached here — the app persists the trip itself in localStorage.
-const CACHE = 'sidequest-v4';
-const EXT_CACHE = 'sidequest-ext-v1';
+const CACHE = 'pithop-v5';
+const EXT_CACHE = 'pithop-ext-v1';
 const EXT_HOSTS = ['tile.openstreetmap.org', 'maps.geoapify.com', 'upload.wikimedia.org'];
 const EXT_MAX_ENTRIES = 600;
 
