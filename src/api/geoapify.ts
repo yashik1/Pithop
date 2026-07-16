@@ -142,10 +142,12 @@ export async function fetchGeoapifyRoadside(samples: LatLng[]): Promise<Stop[]> 
       const lng = props.lon ?? f.geometry?.coordinates?.[0];
       if (lat == null || lng == null) continue;
       // Unnamed food places aren't useful stops; rest stops get default names.
-      let name: string | undefined = props.name;
+      // Coerce to string — rare POIs carry numeric names, which must not crash
+      // downstream string handling.
+      let name: string | undefined = props.name != null ? String(props.name) : undefined;
       if (!name) {
         if (cat.kind === 'rest_area') name = 'Rest area';
-        else if (cat.kind === 'fuel') name = props.brand ?? 'Fuel station';
+        else if (cat.kind === 'fuel') name = props.brand != null ? String(props.brand) : 'Fuel station';
         else if (cat.kind === 'viewpoint') name = 'Scenic viewpoint';
       }
       if (!name) continue;
