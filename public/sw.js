@@ -27,6 +27,9 @@ self.addEventListener('fetch', (event) => {
 
   // Tiles + photos: serve from cache, fetch and store on miss. Tile URLs are
   // effectively immutable, so cache-first is safe and instant offline.
+  // The network response is returned IMMEDIATELY — the cache write happens in
+  // the background (waitUntil), and the LRU trim only occasionally, so tiles
+  // never wait on cache bookkeeping (that lag showed up as slow zooms).
   if (EXT_HOSTS.some((h) => url.hostname === h || url.hostname.endsWith('.' + h))) {
     event.respondWith(
       caches
@@ -37,9 +40,18 @@ self.addEventListener('fetch', (event) => {
           const res = await fetch(event.request);
           // Opaque responses are what no-cors <img> tiles return — cacheable.
           if (res.ok || res.type === 'opaque') {
-            await cache.put(event.request, res.clone());
-            const keys = await cache.keys();
-            if (keys.length > EXT_MAX_ENTRIES) await cache.delete(keys[0]);
+            const copy = res.clone();
+            event.waitUntil(
+              (async () => {
+                await cache.put(event.request, copy);
+                if (Math.random() < 0.05) {
+                  const keys = await cache.keys();
+                  for (let i = 0; i < keys.length - EXT_MAX_ENTRIES; i++) {
+                    await cache.delete(keys[i]);
+                  }
+                }
+              })(),
+            );
           }
           return res;
         })

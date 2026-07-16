@@ -21,8 +21,9 @@ export function hasGeoapify(): boolean {
 }
 
 export function geoapifyTileLayer(): { url: string; attribution: string } {
+  // {r} → '@2x' on high-DPI screens (Leaflet fills it in): crisp retina tiles.
   return {
-    url: `https://maps.geoapify.com/v1/tile/osm-bright/{z}/{x}/{y}.png?apiKey=${KEY}`,
+    url: `https://maps.geoapify.com/v1/tile/osm-bright/{z}/{x}/{y}{r}.png?apiKey=${KEY}`,
     attribution:
       'Powered by <a href="https://www.geoapify.com/">Geoapify</a> | ' +
       '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',

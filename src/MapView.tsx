@@ -111,7 +111,15 @@ export function MapView({
           url: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
           attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
         };
-    L.tileLayer(tiles.url, { attribution: tiles.attribution, maxZoom: 19 }).addTo(map);
+    // keepBuffer: hold a wider ring of tiles so pans/zoom-outs reuse them;
+    // updateWhenIdle:false starts fetching while the map is still moving —
+    // both shrink the "blurry tiles" window after a zoom.
+    L.tileLayer(tiles.url, {
+      attribution: tiles.attribution,
+      maxZoom: 19,
+      keepBuffer: 4,
+      updateWhenIdle: false,
+    }).addTo(map);
     routeLayerRef.current = L.layerGroup().addTo(map);
     stopsLayerRef.current = L.layerGroup().addTo(map);
     pinLayerRef.current = L.layerGroup().addTo(map);

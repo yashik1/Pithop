@@ -1812,9 +1812,11 @@ body {
   color: #9dc1ff;
 }
 
-/* Invert the (light) raster tiles into a night map. Applies only to the tile
-   pane, so markers, the route line and popups keep their true colors. */
-:root[data-theme='dark'] .leaflet-tile-pane {
+/* Invert the (light) raster tiles into a night map. Applied per tile image —
+   not to the whole pane — so zoom animations don't re-rasterize one giant
+   filtered layer (that showed up as long blurry zooms in dark mode). Markers,
+   the route line and popups keep their true colors. */
+:root[data-theme='dark'] img.leaflet-tile {
   filter: invert(1) hue-rotate(180deg) brightness(0.91) contrast(0.9) saturate(0.8);
 }
 
