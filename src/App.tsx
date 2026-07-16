@@ -443,7 +443,7 @@ export default function App() {
   async function shareTrip() {
     const url = buildShareUrl();
     if (!url) return;
-    const shareData = { title: 'SideQuest road trip', text: `My road trip: ${routeLabel}`, url };
+    const shareData = { title: 'Pithop road trip', text: `My road trip: ${routeLabel}`, url };
     try {
       if (navigator.share) {
         await navigator.share(shareData);
@@ -700,7 +700,7 @@ export default function App() {
           <header className="brand">
             <div className="brand-top">
             <h1>
-              <span className="brand-icon">🛣️</span> <span className="brand-name">SideQuest</span>
+              <span className="brand-icon">🛣️</span> <span className="brand-name">Pithop</span>
             </h1>
             <div className="head-tools">
               <select

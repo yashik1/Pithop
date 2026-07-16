@@ -21,6 +21,8 @@ export interface StoredTrip extends TripData {
   savedAt: number;
 }
 
+// Legacy key names kept on purpose after the rebrand to Pithop — renaming
+// them would silently wipe existing users' saved trips.
 const CURRENT_KEY = 'sidequest-trip-v1';
 const LIBRARY_KEY = 'sidequest-trips-v1';
 export const TRIP_LIMIT = 15;
