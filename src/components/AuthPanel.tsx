@@ -9,8 +9,25 @@ export function AuthPanel() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(false);
+  const [gBusy, setGBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
+
+  async function google() {
+    if (gBusy) return;
+    setGBusy(true);
+    setError(null);
+    try {
+      await signInWithGoogle();
+      // On success the browser navigates away; if we're still here after a
+      // moment, something upstream refused the redirect.
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+      setGBusy(false);
+      return;
+    }
+    window.setTimeout(() => setGBusy(false), 4000);
+  }
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -36,8 +53,8 @@ export function AuthPanel() {
   return (
     <div className="auth-panel">
       <p className="auth-intro">{t('signInPrompt')}</p>
-      <button type="button" className="auth-google" onClick={() => void signInWithGoogle()}>
-        <span className="auth-g">G</span> {t('continueGoogle')}
+      <button type="button" className="auth-google" disabled={gBusy} onClick={() => void google()}>
+        <span className="auth-g">G</span> {gBusy ? '…' : t('continueGoogle')}
       </button>
       <div className="auth-or">
         <span>{t('orSep')}</span>

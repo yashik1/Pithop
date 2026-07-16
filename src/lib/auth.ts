@@ -64,10 +64,27 @@ export async function getAccessToken(): Promise<string | null> {
 
 export async function signInWithGoogle(): Promise<void> {
   if (!hasAuth()) return;
-  await (await getClient()).auth.signInWithOAuth({
+  const { error } = await (await getClient()).auth.signInWithOAuth({
     provider: 'google',
     options: { redirectTo: window.location.origin + window.location.pathname },
   });
+  // Normally this call navigates away and never returns; an error here means
+  // the redirect could not even start — surface it instead of failing silently.
+  if (error) throw new Error(error.message);
+}
+
+// Supabase reports OAuth failures by redirecting back with the error in the
+// URL hash (#error=...&error_description=...). Read it once and clean the
+// hash, so the app can show WHY a sign-in bounced instead of looking like
+// the button "did nothing".
+export function consumeAuthErrorFromUrl(): string | null {
+  const m = /[#&]error(?:_code)?=/.test(location.hash)
+    ? new URLSearchParams(location.hash.slice(1))
+    : null;
+  if (!m) return null;
+  const description = m.get('error_description') ?? m.get('error') ?? 'Sign-in failed';
+  history.replaceState(null, '', location.pathname + location.search);
+  return description.replace(/\+/g, ' ');
 }
 
 // Supabase surfaces auth failures as returned errors; normalize to a message
