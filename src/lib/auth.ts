@@ -62,6 +62,23 @@ export async function getAccessToken(): Promise<string | null> {
   return data.session?.access_token ?? null;
 }
 
+// Ask the Supabase server which OAuth providers are actually enabled. The
+// /auth/v1/settings endpoint is public (needs only the anon key) and reflects
+// the dashboard's Providers config. Returns true/false, or null if it can't be
+// determined. This is the definitive check for "Google bounces straight back"
+// — the usual cause is the Google provider simply not being enabled/saved.
+export async function googleEnabled(): Promise<boolean | null> {
+  if (!hasAuth()) return null;
+  try {
+    const res = await fetch(`${URL}/auth/v1/settings`, { headers: { apikey: ANON } });
+    if (!res.ok) return null;
+    const s = await res.json();
+    return Boolean(s?.external?.google);
+  } catch {
+    return null;
+  }
+}
+
 export async function signInWithGoogle(): Promise<void> {
   if (!hasAuth()) return;
   const { error } = await (await getClient()).auth.signInWithOAuth({
