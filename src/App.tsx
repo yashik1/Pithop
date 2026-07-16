@@ -14,7 +14,7 @@ import type { Stop } from './types';
 import { CATEGORIES, CATEGORY_MAP, thingsToDo, type CategoryId } from './lib/categories';
 import { anyAffiliate, gasCashbackLink, hotelsLink, ticketsLink } from './lib/affiliates';
 import { getThemeMode, setThemeMode, type ThemeMode } from './lib/theme';
-import { getUser, hasAuth, signOut, subscribe, type AuthUser } from './lib/auth';
+import { consumeAuthErrorFromUrl, getUser, hasAuth, signOut, subscribe, type AuthUser } from './lib/auth';
 import { AuthPanel } from './components/AuthPanel';
 import { catLabel, getLang, LANGUAGES, setLang, t, type Lang } from './lib/i18n';
 import {
@@ -248,9 +248,13 @@ export default function App() {
   }, []);
 
   // Track sign-in state (community submissions require an account when auth
-  // is configured). No-op when auth isn't set up.
+  // is configured). No-op when auth isn't set up. If an OAuth redirect bounced
+  // back with an error in the URL hash, surface it — otherwise a failed Google
+  // sign-in looks like the button did nothing.
   useEffect(() => {
     if (!hasAuth()) return;
+    const authErr = consumeAuthErrorFromUrl();
+    if (authErr) setError(`Sign-in failed: ${authErr}`);
     void getUser().then(setUser);
     return subscribe(setUser);
   }, []);
