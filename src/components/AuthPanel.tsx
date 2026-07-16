@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { signInWithEmail, signInWithGoogle, signUpWithEmail } from '../lib/auth';
+import { useEffect, useState } from 'react';
+import { googleEnabled, signInWithEmail, signInWithGoogle, signUpWithEmail } from '../lib/auth';
 import { t } from '../lib/i18n';
 
 // Sign-in gate shown inside the add-place card when adding requires an account.
@@ -12,9 +12,22 @@ export function AuthPanel() {
   const [gBusy, setGBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
+  // null = unknown/checking, false = server says Google isn't enabled.
+  const [gEnabled, setGEnabled] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    void googleEnabled().then(setGEnabled);
+  }, []);
+
+  const gDisabledMsg =
+    'Google sign-in is not enabled on your Supabase project. In Supabase → Authentication → Providers → Google, turn it on, paste a valid Client ID + Secret, and Save. (Email/password below works now.)';
 
   async function google() {
     if (gBusy) return;
+    if (gEnabled === false) {
+      setError(gDisabledMsg);
+      return;
+    }
     setGBusy(true);
     setError(null);
     try {
@@ -53,9 +66,15 @@ export function AuthPanel() {
   return (
     <div className="auth-panel">
       <p className="auth-intro">{t('signInPrompt')}</p>
-      <button type="button" className="auth-google" disabled={gBusy} onClick={() => void google()}>
+      <button
+        type="button"
+        className="auth-google"
+        disabled={gBusy || gEnabled === false}
+        onClick={() => void google()}
+      >
         <span className="auth-g">G</span> {gBusy ? '…' : t('continueGoogle')}
       </button>
+      {gEnabled === false && <div className="auth-error">⚠️ {gDisabledMsg}</div>}
       <div className="auth-or">
         <span>{t('orSep')}</span>
       </div>
