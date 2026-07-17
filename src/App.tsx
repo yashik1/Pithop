@@ -524,8 +524,12 @@ export default function App() {
       setRouteLabel(`${shortName(from.displayName)} → ${shortName(to.displayName)}`);
       setBusy('Finding stops along your route…');
 
-      // Cap the number of sample discs so ultra-long routes stay affordable.
-      const spacingKm = Math.max(12, r.distanceKm / 80);
+      // Space the sample discs along the route. Short trips get a much tighter
+      // spacing so dense urban corridors (where each source's per-disc result
+      // cap bites) are covered more fully; the spacing eases back to 12 km by
+      // ~160 km, so medium and long trips — and their API cost — are unchanged.
+      // The distance/80 term still caps ultra-long routes at ~80 discs.
+      const spacingKm = Math.max(r.distanceKm / 80, Math.min(12, 1.5 + r.distanceKm / 15));
       const samples = sampleAlong(r.coords, spacingKm);
       const calcRoute = simplify(r.coords, 1500);
       const cum = cumulativeKm(calcRoute);
