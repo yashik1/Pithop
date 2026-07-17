@@ -99,7 +99,15 @@ function finishPopupSignIn(client: SupabaseClient, popup: Window): Promise<void>
       fn();
     };
     const onMsg = (e: MessageEvent) => {
-      if (e.origin !== location.origin || (e.data as { type?: string })?.type !== 'pithop-auth') return;
+      // Identify the message by the exact window we opened (origin-independent
+      // and unforgeable) rather than by origin — the popup may come back on a
+      // different origin than the opener (www vs bare domain, preview vs prod),
+      // which would drop an origin-matched message and strand the sign-in.
+      if (e.source !== popup || (e.data as { type?: string })?.type !== 'pithop-auth') return;
+      // A message from our popup means success is in flight, so closing it now
+      // is expected — stop the "was it closed?" watchdog before it can reject.
+      window.clearInterval(closedPoll);
+      window.removeEventListener('message', onMsg);
       const d = e.data as { hash?: string; search?: string };
       const params = new URLSearchParams(
         `${String(d.hash ?? '').replace(/^#/, '')}&${String(d.search ?? '').replace(/^\?/, '')}`,
@@ -152,10 +160,10 @@ export function handleAuthPopupHandoff(): boolean {
     const hasResponse =
       /[#&](access_token|error|code)=/.test(location.hash) || /[?&](code|error)=/.test(location.search);
     if (!hasResponse) return false;
-    window.opener.postMessage(
-      { type: 'pithop-auth', hash: location.hash, search: location.search },
-      location.origin,
-    );
+    // Target '*' (not our origin): the opener may be on a different origin
+    // (www vs bare domain, preview vs prod). Delivery still goes only to
+    // window.opener — our own app — and it verifies e.source before trusting it.
+    window.opener.postMessage({ type: 'pithop-auth', hash: location.hash, search: location.search }, '*');
     window.close();
     return true;
   } catch {
