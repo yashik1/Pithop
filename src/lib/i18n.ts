@@ -96,6 +96,12 @@ const en = {
   hintBody:
     "Enter where you're driving from and to. Pithop maps your route and finds viewpoints, quirky attractions, nature, history and food along the way.",
   language: 'Language',
+  vehicle: 'Vehicle',
+  veh_car: 'Car',
+  veh_truck: 'Truck',
+  veh_motorcycle: 'Motorcycle',
+  veh_bike: 'Bicycle',
+  vehNeedsKey: 'Needs the Geoapify key — only cars route on the free server',
 };
 
 export type TKey = keyof typeof en;

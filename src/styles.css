@@ -445,6 +445,49 @@ body {
   outline-color: rgba(255, 255, 255, 0.9);
 }
 
+/* Vehicle profile picker — icon segments on the hero gradient. */
+.vehicle-select {
+  display: flex;
+  gap: 6px;
+  padding: 4px;
+  background: rgba(255, 255, 255, 0.16);
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  border-radius: var(--r-md);
+}
+
+.veh-btn {
+  flex: 1;
+  min-height: 40px;
+  border: none;
+  border-radius: 9px;
+  background: transparent;
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+  opacity: 0.7;
+  transition: background 0.15s var(--ease-out), opacity 0.15s var(--ease-out), transform 0.12s var(--ease-out);
+}
+
+.veh-btn:hover:not(:disabled) {
+  opacity: 1;
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.veh-btn.active {
+  opacity: 1;
+  background: #fff;
+  box-shadow: 0 2px 6px rgba(13, 25, 48, 0.22);
+}
+
+.veh-btn:active:not(:disabled) {
+  transform: scale(0.92);
+}
+
+.veh-btn:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
 /* The big CTA — its text becomes the live status message while busy. */
 .go-btn {
   position: relative;

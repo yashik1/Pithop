@@ -17,6 +17,7 @@ import { getThemeMode, setThemeMode, type ThemeMode } from './lib/theme';
 import { consumeAuthErrorFromUrl, getUser, hasAuth, signOut, subscribe, type AuthUser } from './lib/auth';
 import { AuthPanel } from './components/AuthPanel';
 import { catLabel, getLang, LANGUAGES, setLang, t, type Lang } from './lib/i18n';
+import { getVehicle, setVehicle, VEHICLES, VEHICLE_MAP, type Vehicle } from './lib/vehicle';
 import {
   clearCurrentTrip,
   deleteSavedTrip,
@@ -185,6 +186,10 @@ export default function App() {
   const [themeMode, setThemeModeState] = useState<ThemeMode>(getThemeMode);
   const [units, setUnitsState] = useState<Units>(getUnits);
   const [lang, setLangState] = useState<Lang>(getLang);
+  // Non-car routing needs Geoapify; fall back to car in hobby mode.
+  const [vehicle, setVehicleState] = useState<Vehicle>(() => (hasGeoapify() ? getVehicle() : 'car'));
+  // Ref mirror so a re-run picks the current vehicle without waiting for state.
+  const vehicleRef = useRef<Vehicle>(vehicle);
   const [savedTrips, setSavedTrips] = useState<StoredTrip[]>(listSavedTrips);
   // Community places: shared with all users via the optional backend.
   const [communityOn, setCommunityOn] = useState(false);
@@ -483,6 +488,8 @@ export default function App() {
     setSelectedId(null);
     setAheadOnly(false);
     setMyAlongKm(null);
+    const veh = vehicleRef.current;
+    const offKmh = VEHICLE_MAP[veh].offRouteKmh;
     try {
       const [from, to] = await Promise.all([
         fPick ? Promise.resolve({ ...fPick, displayName: fText }) : geocode(fText),
@@ -490,7 +497,7 @@ export default function App() {
       ]);
       if (!fresh()) return;
       setBusy('Calculating route…');
-      const r = await fetchRoute(from, to);
+      const r = await fetchRoute(from, to, veh);
       if (!fresh()) return;
       setRoute(r);
       setRouteLabel(`${shortName(from.displayName)} → ${shortName(to.displayName)}`);
@@ -513,8 +520,8 @@ export default function App() {
               ...s,
               offRouteKm: proj.offRouteKm,
               alongKm: proj.alongKm,
-              // Rough round-trip detour at ~40 km/h off-highway, plus exit/parking buffer.
-              detourMin: Math.round((proj.offRouteKm * 2 * 60) / 40) + 2,
+              // Round-trip detour at the vehicle's off-route speed, plus a buffer.
+              detourMin: Math.round((proj.offRouteKm * 2 * 60) / offKmh) + 2,
             };
           })
           .filter((s) => s.offRouteKm <= 12)
@@ -598,6 +605,15 @@ export default function App() {
     routeCalcRef.current = null;
     activeLibraryIdRef.current = null;
     clearCurrentTrip();
+  }
+
+  function changeVehicle(v: Vehicle) {
+    if (v === vehicle) return;
+    vehicleRef.current = v;
+    setVehicleState(v);
+    setVehicle(v);
+    // Re-route immediately if a trip is already on screen.
+    if (route && !busy) void findStops();
   }
 
   function toggleCat(id: CategoryId) {
@@ -800,6 +816,25 @@ export default function App() {
                 setToPick({ lat: p.lat, lng: p.lng });
               }}
             />
+            <div className="vehicle-select" role="group" aria-label={t('vehicle')}>
+              {VEHICLES.map((v) => {
+                const locked = v.id !== 'car' && !hasGeoapify();
+                return (
+                  <button
+                    key={v.id}
+                    type="button"
+                    className={`veh-btn${vehicle === v.id ? ' active' : ''}`}
+                    aria-pressed={vehicle === v.id}
+                    aria-label={t(('veh_' + v.id) as 'veh_car')}
+                    title={locked ? t('vehNeedsKey') : t(('veh_' + v.id) as 'veh_car')}
+                    disabled={locked}
+                    onClick={() => changeVehicle(v.id)}
+                  >
+                    {v.icon}
+                  </button>
+                );
+              })}
+            </div>
             <button type="submit" className={`go-btn${busy ? ' busy' : ''}`} disabled={!!busy || !fromText.trim() || !toText.trim()}>
               {busy ?? t('find')}
             </button>
