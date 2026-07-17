@@ -3,7 +3,10 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="description" content="Find fun stops, hidden gems and breaks along your driving route." />
+    <meta
+      name="description"
+      content="Pithop is a free road-trip planner. Enter where you're driving from and to, and it maps your route and finds the best stops along the way — scenic viewpoints, quirky attractions, nature, history, museums and food — then guides you there with live in-browser navigation. No download required."
+    />
     <meta name="theme-color" content="#2563eb" />
     <link rel="icon" href="/icon.svg" type="image/svg+xml" />
     <link rel="manifest" href="/manifest.webmanifest" />
@@ -53,10 +56,62 @@
       :root[data-theme='dark'] #root {
         background: #0f1826;
       }
+      /* Static landing shown in the served HTML (so search engines and
+         reviewers can read what the app is) and as a branded loading screen
+         until the app's JavaScript mounts and replaces it. */
+      .preload {
+        max-width: 640px;
+        margin: 0 auto;
+        padding: 56px 24px;
+        font-family: system-ui, -apple-system, 'Segoe UI', Roboto, Arial, sans-serif;
+        color: #1e3a8a;
+        text-align: center;
+      }
+      .preload h1 {
+        font-size: 34px;
+        margin: 0 0 6px;
+      }
+      .preload .lede {
+        font-size: 17px;
+        font-weight: 600;
+        color: #2563eb;
+        margin: 0 0 18px;
+      }
+      .preload p {
+        font-size: 15px;
+        line-height: 1.6;
+        color: #46586f;
+      }
+      .preload .loading {
+        margin-top: 22px;
+        font-size: 13px;
+        color: #7d8ea6;
+      }
+      :root[data-theme='dark'] .preload {
+        color: #dbe6ff;
+      }
+      :root[data-theme='dark'] .preload p {
+        color: #aebdd1;
+      }
     </style>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <!-- Replaced by the app on load; present so the home page explains
+           itself without JavaScript (for crawlers and OAuth review). -->
+      <div class="preload">
+        <h1>🛣️ Pithop</h1>
+        <p class="lede">A free road-trip planner that finds the best stops along your route.</p>
+        <p>
+          Enter where you're driving from and to, and Pithop maps your route and finds interesting places to stop
+          along the way — scenic viewpoints, quirky roadside attractions, nature and parks, history, museums, and
+          food — filtered by how far off your route they are and how long you'd like to stop. Save your trips,
+          follow them with live in-browser navigation and voice directions, and optionally sign in to share great
+          places with other travellers. It runs in your browser with nothing to download.
+        </p>
+        <p class="loading">Loading the map…</p>
+      </div>
+    </div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
