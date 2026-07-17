@@ -97,6 +97,7 @@ const en = {
   hintBody:
     "Enter where you're driving from and to. Pithop maps your route and finds viewpoints, quirky attractions, nature, history and food along the way.",
   language: 'Language',
+  website: 'Website',
   vehicle: 'Vehicle',
   veh_car: 'Car',
   veh_truck: 'Truck',

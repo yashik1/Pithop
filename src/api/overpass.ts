@@ -60,6 +60,24 @@ async function runQuery(endpoint: string, query: string): Promise<OverpassElemen
   }
 }
 
+// The place's own website from OSM tags. OSM values are messy — protocol
+// often missing, occasionally junk — so normalize and validate: http(s) only,
+// parseable, and returned in serialized (percent-encoded) form so the value is
+// safe to drop into an href. Also used by the Geoapify provider.
+export function websiteFromTags(tags: Record<string, string>): string | undefined {
+  const raw = tags.website ?? tags['contact:website'] ?? tags.url;
+  if (!raw || typeof raw !== 'string') return undefined;
+  const candidate = /^[a-z][a-z0-9+.-]*:/i.test(raw.trim()) ? raw.trim() : `https://${raw.trim()}`;
+  try {
+    const u = new URL(candidate);
+    if (u.protocol !== 'http:' && u.protocol !== 'https:') return undefined;
+    if (!u.hostname.includes('.')) return undefined;
+    return u.href;
+  } catch {
+    return undefined;
+  }
+}
+
 // Read a free/paid parking signal from OSM tags, when unambiguous:
 // an explicit `parking:fee`, or a `fee` on an actual parking amenity.
 // Returns undefined when there's no clear signal (most POIs).
@@ -165,6 +183,7 @@ export async function fetchRoadsideStops(samples: LatLng[]): Promise<Stop[]> {
       visitMin: visitMinutes(cat.kind),
       source: 'osm',
       description: describeOsm(tags, cat.kind),
+      website: websiteFromTags(tags),
       parking: parkingFromTags(tags),
       offRouteKm: 0,
       alongKm: 0,

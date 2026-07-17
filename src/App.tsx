@@ -1321,6 +1321,11 @@ export default function App() {
                             <p className="stop-by">👤 {t('addedBy', { name: s.by })}</p>
                           )}
                           <div className="stop-links" onClick={(e) => e.stopPropagation()}>
+                            {s.website && (
+                              <a href={s.website} target="_blank" rel="noreferrer">
+                                🌐 {t('website')} ↗
+                              </a>
+                            )}
                             {ticketsLink(s.name, s.kind) && (
                               <a className="aff" href={ticketsLink(s.name, s.kind)!} target="_blank" rel="sponsored noreferrer">
                                 🎟️ {t('bookTickets')} ↗
