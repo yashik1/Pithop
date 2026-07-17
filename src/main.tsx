@@ -1,5 +1,6 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
+import { Analytics } from '@vercel/analytics/react';
 import 'leaflet/dist/leaflet.css';
 import './styles.css';
 import App from './App';
@@ -12,6 +13,9 @@ initI18n();
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
     <App />
+    {/* Vercel Web Analytics: cookieless, anonymous visit/referrer counts.
+        No-ops in local/dev and on non-Vercel hosts. */}
+    <Analytics />
   </React.StrictMode>,
 );
 
