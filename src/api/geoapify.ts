@@ -68,7 +68,8 @@ export async function geoapifyGeocode(query: string): Promise<GeocodeResult> {
 export async function geoapifyRoute(from: LatLng, to: LatLng, vehicle: Vehicle = 'car'): Promise<RouteResult> {
   const mode = VEHICLE_MAP[vehicle]?.geoapify ?? 'drive';
   const data = await getJson(
-    `${BASE}/v1/routing?waypoints=${from.lat},${from.lng}%7C${to.lat},${to.lng}&mode=${mode}&apiKey=${KEY}`,
+    `${BASE}/v1/routing?waypoints=${from.lat},${from.lng}%7C${to.lat},${to.lng}&mode=${mode}` +
+      `&details=instruction_details&apiKey=${KEY}`,
   );
   const f = data.features?.[0];
   if (!f) throw new Error('No route found between those places for this vehicle');
@@ -78,10 +79,24 @@ export async function geoapifyRoute(from: LatLng, to: LatLng, vehicle: Vehicle =
   const coords: LatLng[] = [];
   for (const line of lines) for (const [lng, lat] of line) coords.push({ lat, lng });
   if (coords.length < 2) throw new Error('No drivable route found between those places');
+  // Turn-by-turn instructions for the live drive HUD. Each step's from_index
+  // points into its own leg's line, giving the maneuver's coordinate.
+  const steps: RouteResult['steps'] = [];
+  const legs: any[] = f.properties.legs ?? [];
+  legs.forEach((leg, i) => {
+    for (const s of leg.steps ?? []) {
+      const text = s.instruction?.text;
+      const pt = lines[i]?.[s.from_index];
+      if (typeof text === 'string' && text && Array.isArray(pt)) {
+        steps.push({ text, lat: pt[1], lng: pt[0] });
+      }
+    }
+  });
   return {
     coords,
     distanceKm: (f.properties.distance ?? 0) / 1000,
     durationMin: (f.properties.time ?? 0) / 60,
+    steps,
   };
 }
 

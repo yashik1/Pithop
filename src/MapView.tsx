@@ -18,10 +18,13 @@ export interface LiveView {
   on: boolean;
   follow: boolean;
   pos: LivePos | null;
+  turn: string;
   primary: string;
   primaryMeta: string;
   secondary: string;
   offRoute: boolean;
+  voiceOn: boolean;
+  onToggleVoice: () => void;
   onRecenter: () => void;
   onEnd: () => void;
   onPan: () => void;
@@ -307,12 +310,23 @@ export function MapView({
       {live.on && (
         <div className="live-hud">
           <div className="live-info">
+            {live.turn && <div className="live-turn">↱ {live.turn}</div>}
             <div className="live-primary">{live.primary}</div>
             {live.primaryMeta && <div className="live-meta">{live.primaryMeta}</div>}
             {live.secondary && <div className="live-secondary">{live.secondary}</div>}
             {live.offRoute && <div className="live-offroute">⚠️ {t('liveOffRoute')}</div>}
           </div>
           <div className="live-actions">
+            <button
+              type="button"
+              className="live-voice"
+              aria-label={live.voiceOn ? t('liveVoiceOn') : t('liveVoiceOff')}
+              title={live.voiceOn ? t('liveVoiceOn') : t('liveVoiceOff')}
+              aria-pressed={live.voiceOn}
+              onClick={live.onToggleVoice}
+            >
+              {live.voiceOn ? '🔊' : '🔇'}
+            </button>
             {!live.follow && (
               <button
                 type="button"

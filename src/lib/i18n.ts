@@ -112,6 +112,11 @@ const en = {
   liveDest: 'Destination',
   liveNoGeo: 'Live drive needs location access, which this browser does not support.',
   liveBlocked: 'Location is blocked — allow it via the icon in your address bar to drive live.',
+  liveVoiceOn: 'Voice announcements on — tap to mute',
+  liveVoiceOff: 'Voice muted — tap to unmute',
+  liveInMile: 'In one mile',
+  liveInKm: 'In one kilometer',
+  liveArrived: 'You have arrived at your destination',
 };
 
 export type TKey = keyof typeof en;
