@@ -1423,6 +1423,10 @@ export default function App() {
           <a href="/privacy.html" target="_blank" rel="noreferrer">
             Privacy & data sources
           </a>
+          {' · '}
+          <a href="/terms.html" target="_blank" rel="noreferrer">
+            Terms
+          </a>
         </footer>
       </aside>
 
