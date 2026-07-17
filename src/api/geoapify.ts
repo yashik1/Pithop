@@ -8,7 +8,7 @@
 import type { LatLng } from '../lib/geo';
 import type { Stop } from '../types';
 import { visitMinutes, type CategoryId } from '../lib/categories';
-import { describeOsm, parkingFromTags } from './overpass';
+import { describeOsm, parkingFromTags, websiteFromTags } from './overpass';
 import { VEHICLE_MAP, type Vehicle } from '../lib/vehicle';
 import type { GeocodeResult } from './geocode';
 import type { RouteResult } from './route';
@@ -181,6 +181,9 @@ export async function fetchGeoapifyRoadside(samples: LatLng[]): Promise<Stop[]> 
         visitMin: visitMinutes(cat.kind),
         source: 'geoapify',
         description: describeOsm(raw, cat.kind),
+        // Geoapify surfaces a top-level website; fall back to the raw OSM tags.
+        website:
+          (props.website ? websiteFromTags({ website: String(props.website) }) : undefined) ?? websiteFromTags(raw),
         parking: parkingFromTags(raw),
         offRouteKm: 0,
         alongKm: 0,

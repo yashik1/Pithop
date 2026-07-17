@@ -12,6 +12,8 @@ export interface Stop {
   description?: string;
   imageUrl?: string;
   wikiUrl?: string;
+  // The place's own website (from OSM/Geoapify data), normalized to http(s).
+  website?: string;
   // Parking at the spot, when known: free / paid, or 'none' (no on-site parking).
   parking?: 'free' | 'paid' | 'none';
   // Contributor attribution for community stops ("Jane D.").

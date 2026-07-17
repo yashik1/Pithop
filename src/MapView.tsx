@@ -87,6 +87,17 @@ function buildPopup(stop: Stop, live: { current: LiveProps }): HTMLElement {
   if (stop.description) desc.textContent = stop.description;
   else desc.remove();
   div.querySelector('.p-todo')!.textContent = `💡 ${thingsToDo(stop.kind)}`;
+  if (stop.website) {
+    // Built via DOM (not the innerHTML template) — the URL originates in raw
+    // OSM data, so it must land in href as a value, never as markup.
+    const site = document.createElement('a');
+    site.className = 'p-link';
+    site.href = stop.website;
+    site.target = '_blank';
+    site.rel = 'noreferrer';
+    site.textContent = `🌐 ${t('website')} ↗`;
+    div.querySelector('.p-links')!.prepend(site, ' · ');
+  }
   if (stop.source === 'community' && stop.by) {
     // textContent (not innerHTML) — the display name is user-controlled.
     div.querySelector('.p-by')!.textContent = `👤 ${t('addedBy', { name: stop.by })}`;

@@ -80,6 +80,7 @@ const en = {
   travellerTip: 'Traveller tip',
   signInPrompt: 'Sign in to add a place — it keeps community spots trustworthy.',
   continueGoogle: 'Continue with Google',
+  googleWaiting: 'Waiting for Google…',
   orSep: 'or',
   email: 'Email',
   password: 'Password',
@@ -96,6 +97,7 @@ const en = {
   hintBody:
     "Enter where you're driving from and to. Pithop maps your route and finds viewpoints, quirky attractions, nature, history and food along the way.",
   language: 'Language',
+  website: 'Website',
   vehicle: 'Vehicle',
   veh_car: 'Car',
   veh_truck: 'Truck',

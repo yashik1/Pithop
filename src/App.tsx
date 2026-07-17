@@ -1331,6 +1331,11 @@ export default function App() {
                                 ⛽ {t('gasCashback')} ↗
                               </a>
                             )}
+                            {s.website && (
+                              <a href={s.website} target="_blank" rel="noreferrer">
+                                🌐 {t('website')} ↗
+                              </a>
+                            )}
                             {s.wikiUrl && (
                               <a href={s.wikiUrl} target="_blank" rel="noreferrer">
                                 Wikipedia ↗
@@ -1422,6 +1427,10 @@ export default function App() {
           )}
           <a href="/privacy.html" target="_blank" rel="noreferrer">
             Privacy & data sources
+          </a>
+          {' · '}
+          <a href="/terms.html" target="_blank" rel="noreferrer">
+            Terms
           </a>
         </footer>
       </aside>

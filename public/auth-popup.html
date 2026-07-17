@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="robots" content="noindex" />
+    <title>Signing in…</title>
+    <style>
+      body {
+        font-family: system-ui, sans-serif;
+        display: grid;
+        place-items: center;
+        height: 100vh;
+        margin: 0;
+        color: #46586f;
+      }
+    </style>
+  </head>
+  <body>
+    <p>Finishing sign-in… you can close this window.</p>
+    <script>
+      // OAuth landing page for the popup sign-in flow: hand the auth response
+      // (tokens or error, carried in the URL hash/query) back to the app
+      // window that opened this popup, then close.
+      try {
+        if (window.opener) {
+          window.opener.postMessage(
+            { type: 'pithop-auth', hash: location.hash, search: location.search },
+            location.origin,
+          );
+        }
+      } catch (e) {}
+      window.close();
+    </script>
+  </body>
+</html>

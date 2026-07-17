@@ -79,15 +79,99 @@ export async function googleEnabled(): Promise<boolean | null> {
   }
 }
 
+// Waits for the popup's landing page (public/auth-popup.html) to post the
+// OAuth response back, then installs the session on THIS window's client.
+// Resolves on success; rejects with a readable error, including when the
+// user simply closes the popup.
+function finishPopupSignIn(client: SupabaseClient, popup: Window): Promise<void> {
+  return new Promise((resolve, reject) => {
+    let settled = false;
+    const settle = (fn: () => void) => {
+      if (settled) return;
+      settled = true;
+      window.removeEventListener('message', onMsg);
+      window.clearInterval(closedPoll);
+      try {
+        popup.close();
+      } catch {
+        // already closed
+      }
+      fn();
+    };
+    const onMsg = (e: MessageEvent) => {
+      if (e.origin !== location.origin || (e.data as { type?: string })?.type !== 'pithop-auth') return;
+      const d = e.data as { hash?: string; search?: string };
+      const params = new URLSearchParams(
+        `${String(d.hash ?? '').replace(/^#/, '')}&${String(d.search ?? '').replace(/^\?/, '')}`,
+      );
+      void (async () => {
+        try {
+          const access = params.get('access_token');
+          const refresh = params.get('refresh_token');
+          const code = params.get('code');
+          if (access && refresh) {
+            const { error } = await client.auth.setSession({ access_token: access, refresh_token: refresh });
+            if (error) throw new Error(error.message);
+          } else if (code) {
+            // PKCE flow variant — exchange works here because the popup and
+            // this window share the same localStorage code verifier.
+            const { error } = await client.auth.exchangeCodeForSession(code);
+            if (error) throw new Error(error.message);
+          } else {
+            const desc = params.get('error_description') ?? params.get('error') ?? 'Sign-in did not complete';
+            throw new Error(desc.replace(/\+/g, ' '));
+          }
+          settle(resolve);
+        } catch (err) {
+          settle(() => reject(err instanceof Error ? err : new Error(String(err))));
+        }
+      })();
+    };
+    // If the user closes the popup, stop waiting — after a short grace period
+    // so a message posted just before the close still wins the race.
+    const closedPoll = window.setInterval(() => {
+      if (popup.closed) {
+        window.clearInterval(closedPoll);
+        window.setTimeout(() => settle(() => reject(new Error('Sign-in window was closed'))), 500);
+      }
+    }, 400);
+    window.addEventListener('message', onMsg);
+  });
+}
+
 export async function signInWithGoogle(): Promise<void> {
   if (!hasAuth()) return;
-  const { error } = await (await getClient()).auth.signInWithOAuth({
+  // Open the popup synchronously, inside the click gesture — opening it after
+  // an await would trip popup blockers. The OAuth URL is filled in below.
+  const w = 500;
+  const h = 650;
+  const left = Math.max(0, (window.screenX ?? 0) + ((window.outerWidth ?? w) - w) / 2);
+  const top = Math.max(0, (window.screenY ?? 0) + ((window.outerHeight ?? h) - h) / 2);
+  const popup = window.open('about:blank', 'pithop-auth', `popup=yes,width=${w},height=${h},left=${left},top=${top}`);
+  const client = await getClient();
+  if (!popup) {
+    // Popup blocked — fall back to the classic full-tab redirect.
+    const { error } = await client.auth.signInWithOAuth({
+      provider: 'google',
+      options: { redirectTo: window.location.origin + window.location.pathname },
+    });
+    if (error) throw new Error(error.message);
+    return;
+  }
+  const { data, error } = await client.auth.signInWithOAuth({
     provider: 'google',
-    options: { redirectTo: window.location.origin + window.location.pathname },
+    options: { skipBrowserRedirect: true, redirectTo: `${window.location.origin}/auth-popup.html` },
   });
-  // Normally this call navigates away and never returns; an error here means
-  // the redirect could not even start — surface it instead of failing silently.
-  if (error) throw new Error(error.message);
+  if (error || !data?.url) {
+    try {
+      popup.close();
+    } catch {
+      // ignore
+    }
+    throw new Error(error?.message ?? 'Could not start Google sign-in');
+  }
+  popup.location.href = data.url;
+  await finishPopupSignIn(client, popup);
 }
 
 // Supabase reports OAuth failures by redirecting back with the error in the
