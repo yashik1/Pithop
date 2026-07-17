@@ -209,8 +209,22 @@ export default function App() {
   const [liveOn, setLiveOn] = useState(false);
   const [livePos, setLivePos] = useState<LivePos | null>(null);
   const [liveFollow, setLiveFollow] = useState(true);
+  const [voiceOn, setVoiceOn] = useState(() => {
+    try {
+      return localStorage.getItem('sq-live-voice') !== 'off';
+    } catch {
+      return true;
+    }
+  });
+  const voiceRef = useRef(voiceOn);
+  voiceRef.current = voiceOn;
   // Planned stops we've already announced arrival for this drive (don't repeat).
   const announcedRef = useRef<Set<string>>(new Set());
+  // Turn instructions already spoken this drive, keyed by their along-route km
+  // (far = the "in one mile…" heads-up, near = the turn itself).
+  const spokenFarRef = useRef<Set<number>>(new Set());
+  const spokenNearRef = useRef<Set<number>>(new Set());
+  const arrivedRef = useRef(false);
   const routeCalcRef = useRef<{ calcRoute: LatLng[]; cum: number[] } | null>(null);
 
   // Bumped on every new search so a slow response from an old search can't
@@ -724,6 +738,9 @@ export default function App() {
   function startLive() {
     if (!route) return;
     announcedRef.current = new Set();
+    spokenFarRef.current = new Set();
+    spokenNearRef.current = new Set();
+    arrivedRef.current = false;
     setLivePos(null);
     setLiveFollow(true);
     setError(null);
@@ -734,6 +751,41 @@ export default function App() {
   function endLive() {
     setLiveOn(false);
     setLivePos(null);
+    try {
+      window.speechSynthesis?.cancel();
+    } catch {
+      // no speech support
+    }
+  }
+
+  // Voice announcements via the browser's built-in speech synthesis — no
+  // network, no API. Best-effort: silently does nothing where unsupported.
+  function speak(text: string) {
+    if (!voiceRef.current) return;
+    try {
+      window.speechSynthesis?.speak(new SpeechSynthesisUtterance(text));
+    } catch {
+      // no speech support
+    }
+  }
+
+  function toggleVoice() {
+    setVoiceOn((v) => {
+      const next = !v;
+      try {
+        localStorage.setItem('sq-live-voice', next ? 'on' : 'off');
+      } catch {
+        // storage blocked — won't persist
+      }
+      if (!next) {
+        try {
+          window.speechSynthesis?.cancel();
+        } catch {
+          // no speech support
+        }
+      }
+      return next;
+    });
   }
 
   // Follow the device position while live drive is on. High accuracy (we want
@@ -773,7 +825,19 @@ export default function App() {
     };
   }, [liveOn]);
 
-  // Buzz + notice the first time we come within ~400 m of each planned stop.
+  // Turn instructions projected onto the route, sorted by where they happen —
+  // so "the next turn" is just the first one ahead of the driver's position.
+  const liveSteps = useMemo(() => {
+    const calc = routeCalcRef.current;
+    if (!route?.steps?.length || !calc) return [];
+    return route.steps
+      .map((st) => ({ ...st, alongKm: projectOntoRoute(st, calc.calcRoute, calc.cum).alongKm }))
+      .sort((a, b) => a.alongKm - b.alongKm);
+  }, [route]);
+
+  // Announcements while driving: buzz + notice (and voice) the first time we
+  // come within ~400 m of each planned stop; speak each turn twice — a heads-up
+  // a mile/kilometre out and again just before it — and the final arrival.
   useEffect(() => {
     if (!liveOn || !livePos) return;
     for (const s of plan) {
@@ -782,7 +846,34 @@ export default function App() {
         announcedRef.current.add(s.id);
         setNotice(`📍 ${t('liveArriving', { name: s.name })}`);
         navigator.vibrate?.([120, 60, 120]);
+        speak(t('liveArriving', { name: s.name }));
       }
+    }
+    const calc = routeCalcRef.current;
+    if (!calc || !route) return;
+    const proj = projectOntoRoute(livePos, calc.calcRoute, calc.cum);
+    const next = liveSteps.find((st) => st.alongKm > proj.alongKm + 0.02);
+    if (next) {
+      const d = next.alongKm - proj.alongKm;
+      const farKm = units === 'mi' ? 1.609 : 1;
+      if (d <= 0.25 && !spokenNearRef.current.has(next.alongKm)) {
+        spokenNearRef.current.add(next.alongKm);
+        spokenFarRef.current.add(next.alongKm); // too late for the heads-up
+        speak(next.text);
+      } else if (d <= farKm && !spokenFarRef.current.has(next.alongKm)) {
+        spokenFarRef.current.add(next.alongKm);
+        speak(`${units === 'mi' ? t('liveInMile') : t('liveInKm')}, ${next.text}`);
+      }
+    }
+    // Compare within the geometry's own cumulative km — the router's stated
+    // road distance can differ from the (simplified) line's length by more
+    // than this threshold, which would make arrival unreachable.
+    const cumTotal = calc.cum[calc.cum.length - 1];
+    if (!arrivedRef.current && cumTotal - proj.alongKm < 0.15 && proj.offRouteKm < 0.5) {
+      arrivedRef.current = true;
+      setNotice(`🏁 ${t('liveArrived')}`);
+      navigator.vibrate?.([120, 60, 120, 60, 240]);
+      speak(t('liveArrived'));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [livePos, liveOn]);
@@ -793,19 +884,28 @@ export default function App() {
   const liveNav = useMemo(() => {
     if (!liveOn) return null;
     const destName = shortName(toText || routeLabel.split('→')[1]?.trim() || '') || t('liveDest');
-    if (!livePos) return { pos: null, primary: t('liveWaiting'), primaryMeta: '', secondary: '', offRoute: false };
+    if (!livePos)
+      return { pos: null, turn: '', primary: t('liveWaiting'), primaryMeta: '', secondary: '', offRoute: false };
     const calc = routeCalcRef.current;
-    if (!calc || !route) return { pos: livePos, primary: `🏁 ${destName}`, primaryMeta: '', secondary: '', offRoute: false };
+    if (!calc || !route)
+      return { pos: livePos, turn: '', primary: `🏁 ${destName}`, primaryMeta: '', secondary: '', offRoute: false };
     const proj = projectOntoRoute(livePos, calc.calcRoute, calc.cum);
     const avgKmh = route.durationMin > 0 ? route.distanceKm / (route.durationMin / 60) : 60;
     const eta = (km: number) => fmtDur((km / avgKmh) * 60);
-    const destKm = Math.max(0, route.distanceKm - proj.alongKm);
+    // Remaining road distance = remaining fraction of the geometry, scaled to
+    // the router's stated distance (the two lengths differ slightly).
+    const cumTotal = calc.cum[calc.cum.length - 1] || 1;
+    const destKm = Math.max(0, (route.distanceKm * (cumTotal - proj.alongKm)) / cumTotal);
     const offRoute = proj.offRouteKm > 0.5;
+    // The next maneuver ahead of the driver, as "distance · instruction".
+    const nextStep = liveSteps.find((st) => st.alongKm > proj.alongKm + 0.02);
+    const turn = nextStep ? `${fmtDist(Math.max(0, nextStep.alongKm - proj.alongKm), units)} · ${nextStep.text}` : '';
     const next = plan.filter((s) => s.alongKm >= proj.alongKm - 0.3).sort((a, b) => a.alongKm - b.alongKm)[0];
     if (next) {
       const nextKm = Math.max(0, next.alongKm - proj.alongKm);
       return {
         pos: livePos,
+        turn,
         primary: `🎯 ${next.name}`,
         primaryMeta: `${fmtDist(nextKm, units)} · ${t('liveEta')} ${eta(nextKm)}`,
         secondary: `🏁 ${destName} · ${fmtDist(destKm, units)} · ${eta(destKm)}`,
@@ -814,12 +914,13 @@ export default function App() {
     }
     return {
       pos: livePos,
+      turn,
       primary: `🏁 ${destName}`,
       primaryMeta: `${fmtDist(destKm, units)} · ${t('liveEta')} ${eta(destKm)}`,
       secondary: '',
       offRoute,
     };
-  }, [liveOn, livePos, plan, route, units, toText, routeLabel]);
+  }, [liveOn, livePos, plan, route, units, toText, routeLabel, liveSteps]);
 
   return (
     <div className="app">
@@ -1345,10 +1446,13 @@ export default function App() {
           on: liveOn,
           follow: liveFollow,
           pos: liveNav?.pos ?? null,
+          turn: liveNav?.turn ?? '',
           primary: liveNav?.primary ?? '',
           primaryMeta: liveNav?.primaryMeta ?? '',
           secondary: liveNav?.secondary ?? '',
           offRoute: liveNav?.offRoute ?? false,
+          voiceOn,
+          onToggleVoice: toggleVoice,
           onRecenter: () => setLiveFollow(true),
           onEnd: endLive,
           onPan: () => setLiveFollow(false),

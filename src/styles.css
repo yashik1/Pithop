@@ -1964,6 +1964,17 @@ body {
   min-width: 0;
 }
 
+/* Next-turn instruction — the biggest line, like a nav app. */
+.live-turn {
+  margin-bottom: 6px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.15);
+  font-size: 17px;
+  font-weight: 800;
+  line-height: 1.25;
+  color: #93c5fd;
+}
+
 .live-primary {
   font-size: 16px;
   font-weight: 800;
@@ -2003,6 +2014,7 @@ body {
   flex-shrink: 0;
 }
 
+.live-voice,
 .live-recenter,
 .live-end {
   border: none;
@@ -2013,6 +2025,7 @@ body {
   transition: filter 0.15s var(--ease-out), transform 0.12s var(--ease-out);
 }
 
+.live-voice,
 .live-recenter {
   width: 34px;
   height: 34px;
@@ -2022,6 +2035,10 @@ body {
   color: #fff;
 }
 
+.live-voice {
+  font-size: 15px;
+}
+
 .live-end {
   padding: 8px 12px;
   font-size: 13px;
@@ -2029,11 +2046,13 @@ body {
   color: #fff;
 }
 
+.live-voice:hover,
 .live-recenter:hover,
 .live-end:hover {
   filter: brightness(1.2);
 }
 
+.live-voice:active,
 .live-recenter:active,
 .live-end:active {
   transform: scale(0.94);
