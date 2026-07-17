@@ -139,6 +139,30 @@ function finishPopupSignIn(client: SupabaseClient, popup: Window): Promise<void>
   });
 }
 
+// When Supabase redirects the OAuth popup to the Site URL (the app root)
+// instead of /auth-popup.html — which happens unless that exact path is in the
+// redirect allow-list — the popup ends up loading the whole app. Detect that
+// case at startup: a window that has an opener AND an auth response in its URL
+// is our popup. Hand the response back to the opener and close, so the flow
+// finishes without depending on the popup landing on a specific page. Returns
+// true when handled (the caller then skips booting the app in the popup).
+export function handleAuthPopupHandoff(): boolean {
+  try {
+    if (!window.opener || window.opener === window) return false;
+    const hasResponse =
+      /[#&](access_token|error|code)=/.test(location.hash) || /[?&](code|error)=/.test(location.search);
+    if (!hasResponse) return false;
+    window.opener.postMessage(
+      { type: 'pithop-auth', hash: location.hash, search: location.search },
+      location.origin,
+    );
+    window.close();
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export async function signInWithGoogle(): Promise<void> {
   if (!hasAuth()) return;
   // Open the popup synchronously, inside the click gesture — opening it after
