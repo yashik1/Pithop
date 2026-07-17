@@ -80,6 +80,7 @@ const en = {
   travellerTip: 'Traveller tip',
   signInPrompt: 'Sign in to add a place — it keeps community spots trustworthy.',
   continueGoogle: 'Continue with Google',
+  googleWaiting: 'Waiting for Google…',
   orSep: 'or',
   email: 'Email',
   password: 'Password',

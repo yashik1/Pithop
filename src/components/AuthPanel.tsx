@@ -31,15 +31,15 @@ export function AuthPanel() {
     setGBusy(true);
     setError(null);
     try {
+      // Runs Google in a popup; resolves once the session is installed (the
+      // auth listener then swaps this panel for the add-place form). If the
+      // popup is blocked it falls back to a full-tab redirect instead.
       await signInWithGoogle();
-      // On success the browser navigates away; if we're still here after a
-      // moment, something upstream refused the redirect.
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
+    } finally {
       setGBusy(false);
-      return;
     }
-    window.setTimeout(() => setGBusy(false), 4000);
   }
 
   async function submit(e: React.FormEvent) {
@@ -72,7 +72,7 @@ export function AuthPanel() {
         disabled={gBusy || gEnabled === false}
         onClick={() => void google()}
       >
-        <span className="auth-g">G</span> {gBusy ? '…' : t('continueGoogle')}
+        <span className="auth-g">G</span> {gBusy ? t('googleWaiting') : t('continueGoogle')}
       </button>
       {gEnabled === false && <div className="auth-error">⚠️ {gDisabledMsg}</div>}
       <div className="auth-or">
