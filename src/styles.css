@@ -1914,6 +1914,183 @@ body {
   box-shadow: 0 6px 18px rgba(0, 0, 0, 0.4);
 }
 
+/* ---------- Live drive mode ---------- */
+
+.summary-live {
+  width: 100%;
+  margin-top: 10px;
+  min-height: 44px;
+  border: none;
+  border-radius: 10px;
+  background: var(--grad-cta);
+  color: #fff;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 3px 10px rgba(37, 99, 235, 0.3);
+  transition: filter 0.15s var(--ease-out), transform 0.12s var(--ease-out);
+}
+
+.summary-live:hover {
+  filter: brightness(1.08);
+}
+
+.summary-live:active {
+  transform: scale(0.99);
+}
+
+/* Heads-up display floating over the map while driving. */
+.live-hud {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  right: 12px;
+  z-index: 20;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 14px;
+  border-radius: var(--r-lg);
+  background: rgba(16, 29, 51, 0.92);
+  color: #fff;
+  box-shadow: var(--shadow-3);
+  backdrop-filter: blur(6px);
+  animation: rise-in 0.2s var(--ease-out) backwards;
+}
+
+.live-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.live-primary {
+  font-size: 16px;
+  font-weight: 800;
+  line-height: 1.2;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.live-meta {
+  margin-top: 2px;
+  font-size: 14px;
+  font-weight: 700;
+  color: #bfdbfe;
+}
+
+.live-secondary {
+  margin-top: 4px;
+  font-size: 12.5px;
+  color: #cbd5e1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.live-offroute {
+  margin-top: 6px;
+  font-size: 12.5px;
+  font-weight: 700;
+  color: #fca5a5;
+}
+
+.live-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.live-recenter,
+.live-end {
+  border: none;
+  border-radius: 999px;
+  font-family: inherit;
+  font-weight: 700;
+  cursor: pointer;
+  transition: filter 0.15s var(--ease-out), transform 0.12s var(--ease-out);
+}
+
+.live-recenter {
+  width: 34px;
+  height: 34px;
+  align-self: flex-end;
+  font-size: 18px;
+  background: rgba(255, 255, 255, 0.16);
+  color: #fff;
+}
+
+.live-end {
+  padding: 8px 12px;
+  font-size: 13px;
+  background: rgba(255, 255, 255, 0.16);
+  color: #fff;
+}
+
+.live-recenter:hover,
+.live-end:hover {
+  filter: brightness(1.2);
+}
+
+.live-recenter:active,
+.live-end:active {
+  transform: scale(0.94);
+}
+
+/* The "you are here" marker: a solid dot with a pulsing halo, and an optional
+   heading arrow pointing the direction of travel. */
+.live-icon {
+  background: transparent;
+  border: none;
+}
+
+.live-dot {
+  position: relative;
+  display: block;
+  width: 18px;
+  height: 18px;
+  margin: 4px;
+  border-radius: 50%;
+  background: var(--primary);
+  border: 2.5px solid #fff;
+  box-shadow: 0 1px 4px rgba(16, 29, 51, 0.5);
+}
+
+.live-dot::before {
+  content: '';
+  position: absolute;
+  inset: -6px;
+  border-radius: 50%;
+  background: rgba(37, 99, 235, 0.35);
+  animation: live-pulse 1.8s var(--ease-out) infinite;
+}
+
+.live-arrow {
+  position: absolute;
+  left: 50%;
+  top: -9px;
+  width: 0;
+  height: 0;
+  margin-left: -5px;
+  border-left: 5px solid transparent;
+  border-right: 5px solid transparent;
+  border-bottom: 8px solid var(--primary);
+  transform-origin: 50% 17px;
+}
+
+@keyframes live-pulse {
+  0% {
+    transform: scale(0.7);
+    opacity: 0.8;
+  }
+  100% {
+    transform: scale(2.2);
+    opacity: 0;
+  }
+}
+
 .add-place {
   margin: 12px 14px 0;
   padding: 14px 16px;

@@ -77,7 +77,7 @@ function parseShareHash(): { fromText: string; toText: string; plan: Stop[] } | 
 import { cumulativeKm, haversineKm, projectOntoRoute, sampleAlong, simplify, type LatLng } from './lib/geo';
 import { distValue, fmtDist, fmtDur, type Units } from './lib/format';
 import { getUnits, setUnits } from './lib/units';
-import { MapView } from './MapView';
+import { MapView, type LivePos } from './MapView';
 import { PlaceInput } from './components/PlaceInput';
 
 const DETOUR_OPTIONS = [5, 10, 15, 25, 40];
@@ -204,6 +204,13 @@ export default function App() {
   const [addError, setAddError] = useState<string | null>(null);
   const [locating, setLocating] = useState(false);
   const [user, setUser] = useState<AuthUser | null>(null);
+  // Live drive mode: follow the trip on the map (GPS position, distance/ETA to
+  // the next stop and destination, arrival alerts) without leaving for Maps.
+  const [liveOn, setLiveOn] = useState(false);
+  const [livePos, setLivePos] = useState<LivePos | null>(null);
+  const [liveFollow, setLiveFollow] = useState(true);
+  // Planned stops we've already announced arrival for this drive (don't repeat).
+  const announcedRef = useRef<Set<string>>(new Set());
   const routeCalcRef = useRef<{ calcRoute: LatLng[]; cum: number[] } | null>(null);
 
   // Bumped on every new search so a slow response from an old search can't
@@ -602,6 +609,7 @@ export default function App() {
     setToText('');
     setFromPick(null);
     setToPick(null);
+    endLive();
     routeCalcRef.current = null;
     activeLibraryIdRef.current = null;
     clearCurrentTrip();
@@ -712,6 +720,106 @@ export default function App() {
       (e: Error) => setError(e.message),
     );
   }
+
+  function startLive() {
+    if (!route) return;
+    announcedRef.current = new Set();
+    setLivePos(null);
+    setLiveFollow(true);
+    setError(null);
+    setNotice(null);
+    setLiveOn(true);
+  }
+
+  function endLive() {
+    setLiveOn(false);
+    setLivePos(null);
+  }
+
+  // Follow the device position while live drive is on. High accuracy (we want
+  // the GPS chip when driving), and a best-effort screen wake lock so the phone
+  // doesn't sleep mid-trip. watchPosition keeps firing on its own — transient
+  // errors are ignored; only a denied permission ends the mode.
+  useEffect(() => {
+    if (!liveOn) return;
+    if (!navigator.geolocation) {
+      setError(t('liveNoGeo'));
+      setLiveOn(false);
+      return;
+    }
+    let wakeLock: { release?: () => Promise<void> } | null = null;
+    const wl = (navigator as unknown as { wakeLock?: { request: (t: string) => Promise<any> } }).wakeLock;
+    if (wl?.request) wl.request('screen').then((w) => (wakeLock = w)).catch(() => {});
+    const id = navigator.geolocation.watchPosition(
+      (pos) => {
+        setLivePos({
+          lat: pos.coords.latitude,
+          lng: pos.coords.longitude,
+          heading: pos.coords.heading,
+          accuracy: pos.coords.accuracy,
+        });
+      },
+      (err) => {
+        if (err.code === err.PERMISSION_DENIED) {
+          setError(t('liveBlocked'));
+          setLiveOn(false);
+        }
+      },
+      { enableHighAccuracy: true, maximumAge: 2000, timeout: 20000 },
+    );
+    return () => {
+      navigator.geolocation.clearWatch(id);
+      void wakeLock?.release?.().catch(() => {});
+    };
+  }, [liveOn]);
+
+  // Buzz + notice the first time we come within ~400 m of each planned stop.
+  useEffect(() => {
+    if (!liveOn || !livePos) return;
+    for (const s of plan) {
+      if (announcedRef.current.has(s.id)) continue;
+      if (haversineKm(livePos, s) <= 0.4) {
+        announcedRef.current.add(s.id);
+        setNotice(`📍 ${t('liveArriving', { name: s.name })}`);
+        navigator.vibrate?.([120, 60, 120]);
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [livePos, liveOn]);
+
+  // Live HUD figures: project the position onto the route to get progress, then
+  // distance/ETA to the next planned stop ahead and to the destination. ETA uses
+  // the route's own average speed so it agrees with the planned drive time.
+  const liveNav = useMemo(() => {
+    if (!liveOn) return null;
+    const destName = shortName(toText || routeLabel.split('→')[1]?.trim() || '') || t('liveDest');
+    if (!livePos) return { pos: null, primary: t('liveWaiting'), primaryMeta: '', secondary: '', offRoute: false };
+    const calc = routeCalcRef.current;
+    if (!calc || !route) return { pos: livePos, primary: `🏁 ${destName}`, primaryMeta: '', secondary: '', offRoute: false };
+    const proj = projectOntoRoute(livePos, calc.calcRoute, calc.cum);
+    const avgKmh = route.durationMin > 0 ? route.distanceKm / (route.durationMin / 60) : 60;
+    const eta = (km: number) => fmtDur((km / avgKmh) * 60);
+    const destKm = Math.max(0, route.distanceKm - proj.alongKm);
+    const offRoute = proj.offRouteKm > 0.5;
+    const next = plan.filter((s) => s.alongKm >= proj.alongKm - 0.3).sort((a, b) => a.alongKm - b.alongKm)[0];
+    if (next) {
+      const nextKm = Math.max(0, next.alongKm - proj.alongKm);
+      return {
+        pos: livePos,
+        primary: `🎯 ${next.name}`,
+        primaryMeta: `${fmtDist(nextKm, units)} · ${t('liveEta')} ${eta(nextKm)}`,
+        secondary: `🏁 ${destName} · ${fmtDist(destKm, units)} · ${eta(destKm)}`,
+        offRoute,
+      };
+    }
+    return {
+      pos: livePos,
+      primary: `🏁 ${destName}`,
+      primaryMeta: `${fmtDist(destKm, units)} · ${t('liveEta')} ${eta(destKm)}`,
+      secondary: '',
+      offRoute,
+    };
+  }, [liveOn, livePos, plan, route, units, toText, routeLabel]);
 
   return (
     <div className="app">
@@ -969,6 +1077,11 @@ export default function App() {
                 With your {plan.length} stop{plan.length > 1 ? 's' : ''}: ≈{' '}
                 {fmtDur(route.durationMin + planExtraMin)} total (+{fmtDur(planExtraMin)})
               </div>
+            )}
+            {!liveOn && (
+              <button type="button" className="summary-live" onClick={startLive}>
+                ▶ {t('liveDrive')}
+              </button>
             )}
             {stops.length > 0 && (
               <label className="ahead">
@@ -1228,6 +1341,18 @@ export default function App() {
         onPickPoint={pickAddPoint}
         pinPreview={addPin}
         lang={lang}
+        live={{
+          on: liveOn,
+          follow: liveFollow,
+          pos: liveNav?.pos ?? null,
+          primary: liveNav?.primary ?? '',
+          primaryMeta: liveNav?.primaryMeta ?? '',
+          secondary: liveNav?.secondary ?? '',
+          offRoute: liveNav?.offRoute ?? false,
+          onRecenter: () => setLiveFollow(true),
+          onEnd: endLive,
+          onPan: () => setLiveFollow(false),
+        }}
       />
     </div>
   );

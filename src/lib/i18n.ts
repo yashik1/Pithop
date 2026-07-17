@@ -102,6 +102,16 @@ const en = {
   veh_motorcycle: 'Motorcycle',
   veh_bike: 'Bicycle',
   vehNeedsKey: 'Needs the Geoapify key — only cars route on the free server',
+  liveDrive: 'Drive live on the map',
+  liveWaiting: 'Getting your location…',
+  liveEta: 'ETA',
+  liveEnd: 'End',
+  liveRecenter: 'Re-centre on me',
+  liveOffRoute: 'Off the planned route',
+  liveArriving: 'Approaching {name}',
+  liveDest: 'Destination',
+  liveNoGeo: 'Live drive needs location access, which this browser does not support.',
+  liveBlocked: 'Location is blocked — allow it via the icon in your address bar to drive live.',
 };
 
 export type TKey = keyof typeof en;

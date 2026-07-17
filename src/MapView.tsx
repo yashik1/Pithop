@@ -7,6 +7,26 @@ import { fmtDur } from './lib/format';
 import { geoapifyTileLayer, hasGeoapify } from './api/geoapify';
 import { catLabel, t, type Lang } from './lib/i18n';
 
+export interface LivePos {
+  lat: number;
+  lng: number;
+  heading?: number | null;
+  accuracy?: number;
+}
+
+export interface LiveView {
+  on: boolean;
+  follow: boolean;
+  pos: LivePos | null;
+  primary: string;
+  primaryMeta: string;
+  secondary: string;
+  offRoute: boolean;
+  onRecenter: () => void;
+  onEnd: () => void;
+  onPan: () => void;
+}
+
 interface Props {
   route: RouteResult | null;
   stops: Stop[];
@@ -20,6 +40,7 @@ interface Props {
   onPickPoint: (p: { lat: number; lng: number }) => void;
   pinPreview: { lat: number; lng: number } | null;
   lang: Lang;
+  live: LiveView;
 }
 
 interface LiveProps {
@@ -90,6 +111,7 @@ export function MapView({
   onPickPoint,
   pinPreview,
   lang,
+  live,
 }: Props) {
   void lang; // re-render markers/labels when the language changes
   const divRef = useRef<HTMLDivElement>(null);
@@ -97,9 +119,15 @@ export function MapView({
   const routeLayerRef = useRef<L.LayerGroup | null>(null);
   const stopsLayerRef = useRef<L.LayerGroup | null>(null);
   const pinLayerRef = useRef<L.LayerGroup | null>(null);
+  const liveLayerRef = useRef<L.LayerGroup | null>(null);
+  const liveStartedRef = useRef(false);
   const markersRef = useRef(new Map<string, L.CircleMarker>());
   const liveRef = useRef<LiveProps>({ planIds, onSelect, onTogglePlan, addArmed, onPickPoint });
   liveRef.current = { planIds, onSelect, onTogglePlan, addArmed, onPickPoint };
+  // Latest live-nav props for the map's own event handlers (e.g. drag-to-pan
+  // during a live drive pauses auto-follow).
+  const liveNavRef = useRef<LiveView>(live);
+  liveNavRef.current = live;
 
   useEffect(() => {
     const map = L.map(divRef.current!, { preferCanvas: true }).setView([39.5, -98.35], 4);
@@ -123,9 +151,16 @@ export function MapView({
     routeLayerRef.current = L.layerGroup().addTo(map);
     stopsLayerRef.current = L.layerGroup().addTo(map);
     pinLayerRef.current = L.layerGroup().addTo(map);
+    liveLayerRef.current = L.layerGroup().addTo(map);
     map.on('click', (e: L.LeafletMouseEvent) => {
       const live = liveRef.current;
       if (live.addArmed) live.onPickPoint({ lat: e.latlng.lat, lng: e.latlng.lng });
+    });
+    // Dragging the map during a live drive means the user wants to look around —
+    // pause auto-follow so we stop yanking the view back to their position.
+    map.on('dragstart', () => {
+      const nav = liveNavRef.current;
+      if (nav.on && nav.follow) nav.onPan();
     });
     mapRef.current = map;
     return () => {
@@ -215,9 +250,86 @@ export function MapView({
     );
   }, [pinPreview]);
 
+  // Live drive: a pulsing "you are here" dot (with a heading arrow when the
+  // device reports one) plus a faint accuracy ring, following the user as they
+  // move when auto-follow is on.
+  useEffect(() => {
+    const layer = liveLayerRef.current;
+    const map = mapRef.current;
+    if (!layer || !map) return;
+    layer.clearLayers();
+    if (!live.on || !live.pos) {
+      liveStartedRef.current = false;
+      return;
+    }
+    const { lat, lng, heading, accuracy } = live.pos;
+    if (accuracy != null && accuracy > 0 && accuracy < 2000) {
+      layer.addLayer(
+        L.circle([lat, lng], {
+          radius: accuracy,
+          color: '#2563eb',
+          weight: 1,
+          opacity: 0.35,
+          fillColor: '#2563eb',
+          fillOpacity: 0.1,
+          interactive: false,
+        }),
+      );
+    }
+    const rot =
+      heading != null && !Number.isNaN(heading) ? ` style="transform:rotate(${heading}deg)"` : '';
+    const arrow = heading != null && !Number.isNaN(heading) ? `<i class="live-arrow"${rot}></i>` : '';
+    layer.addLayer(
+      L.marker([lat, lng], {
+        icon: L.divIcon({
+          className: 'live-icon',
+          html: `<span class="live-dot">${arrow}</span>`,
+          iconSize: [26, 26],
+          iconAnchor: [13, 13],
+        }),
+        interactive: false,
+        zIndexOffset: 1000,
+      }),
+    );
+    if (live.follow) {
+      if (!liveStartedRef.current) {
+        map.setView([lat, lng], Math.max(map.getZoom(), 15), { animate: true });
+        liveStartedRef.current = true;
+      } else {
+        map.panTo([lat, lng], { animate: true });
+      }
+    }
+  }, [live.on, live.pos, live.follow]);
+
   return (
     <div className="map">
       <div ref={divRef} className="map-canvas" />
+      {live.on && (
+        <div className="live-hud">
+          <div className="live-info">
+            <div className="live-primary">{live.primary}</div>
+            {live.primaryMeta && <div className="live-meta">{live.primaryMeta}</div>}
+            {live.secondary && <div className="live-secondary">{live.secondary}</div>}
+            {live.offRoute && <div className="live-offroute">⚠️ {t('liveOffRoute')}</div>}
+          </div>
+          <div className="live-actions">
+            {!live.follow && (
+              <button
+                type="button"
+                className="live-recenter"
+                aria-label={t('liveRecenter')}
+                title={t('liveRecenter')}
+                onClick={live.onRecenter}
+              >
+                ◎
+              </button>
+            )}
+            <button type="button" className="live-end" onClick={live.onEnd}>
+              ✕ {t('liveEnd')}
+            </button>
+          </div>
+        </div>
+      )}
       {communityOn && (
         <button type="button" className={`map-add${addArmed ? ' armed' : ''}`} onClick={onToggleAdd}>
           {addArmed ? t('addPlaceArmed') : `📍 ${t('addPlace')}`}
