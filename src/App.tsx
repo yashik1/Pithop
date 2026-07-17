@@ -17,6 +17,7 @@ import { getThemeMode, setThemeMode, type ThemeMode } from './lib/theme';
 import { consumeAuthErrorFromUrl, getUser, hasAuth, signOut, subscribe, type AuthUser } from './lib/auth';
 import { AuthPanel } from './components/AuthPanel';
 import { catLabel, getLang, LANGUAGES, setLang, t, type Lang } from './lib/i18n';
+import { getVehicle, setVehicle, VEHICLES, VEHICLE_MAP, type Vehicle } from './lib/vehicle';
 import {
   clearCurrentTrip,
   deleteSavedTrip,
@@ -76,7 +77,7 @@ function parseShareHash(): { fromText: string; toText: string; plan: Stop[] } | 
 import { cumulativeKm, haversineKm, projectOntoRoute, sampleAlong, simplify, type LatLng } from './lib/geo';
 import { distValue, fmtDist, fmtDur, type Units } from './lib/format';
 import { getUnits, setUnits } from './lib/units';
-import { MapView } from './MapView';
+import { MapView, type LivePos } from './MapView';
 import { PlaceInput } from './components/PlaceInput';
 
 const DETOUR_OPTIONS = [5, 10, 15, 25, 40];
@@ -185,6 +186,10 @@ export default function App() {
   const [themeMode, setThemeModeState] = useState<ThemeMode>(getThemeMode);
   const [units, setUnitsState] = useState<Units>(getUnits);
   const [lang, setLangState] = useState<Lang>(getLang);
+  // Non-car routing needs Geoapify; fall back to car in hobby mode.
+  const [vehicle, setVehicleState] = useState<Vehicle>(() => (hasGeoapify() ? getVehicle() : 'car'));
+  // Ref mirror so a re-run picks the current vehicle without waiting for state.
+  const vehicleRef = useRef<Vehicle>(vehicle);
   const [savedTrips, setSavedTrips] = useState<StoredTrip[]>(listSavedTrips);
   // Community places: shared with all users via the optional backend.
   const [communityOn, setCommunityOn] = useState(false);
@@ -199,6 +204,13 @@ export default function App() {
   const [addError, setAddError] = useState<string | null>(null);
   const [locating, setLocating] = useState(false);
   const [user, setUser] = useState<AuthUser | null>(null);
+  // Live drive mode: follow the trip on the map (GPS position, distance/ETA to
+  // the next stop and destination, arrival alerts) without leaving for Maps.
+  const [liveOn, setLiveOn] = useState(false);
+  const [livePos, setLivePos] = useState<LivePos | null>(null);
+  const [liveFollow, setLiveFollow] = useState(true);
+  // Planned stops we've already announced arrival for this drive (don't repeat).
+  const announcedRef = useRef<Set<string>>(new Set());
   const routeCalcRef = useRef<{ calcRoute: LatLng[]; cum: number[] } | null>(null);
 
   // Bumped on every new search so a slow response from an old search can't
@@ -483,6 +495,8 @@ export default function App() {
     setSelectedId(null);
     setAheadOnly(false);
     setMyAlongKm(null);
+    const veh = vehicleRef.current;
+    const offKmh = VEHICLE_MAP[veh].offRouteKmh;
     try {
       const [from, to] = await Promise.all([
         fPick ? Promise.resolve({ ...fPick, displayName: fText }) : geocode(fText),
@@ -490,7 +504,7 @@ export default function App() {
       ]);
       if (!fresh()) return;
       setBusy('Calculating route…');
-      const r = await fetchRoute(from, to);
+      const r = await fetchRoute(from, to, veh);
       if (!fresh()) return;
       setRoute(r);
       setRouteLabel(`${shortName(from.displayName)} → ${shortName(to.displayName)}`);
@@ -513,8 +527,8 @@ export default function App() {
               ...s,
               offRouteKm: proj.offRouteKm,
               alongKm: proj.alongKm,
-              // Rough round-trip detour at ~40 km/h off-highway, plus exit/parking buffer.
-              detourMin: Math.round((proj.offRouteKm * 2 * 60) / 40) + 2,
+              // Round-trip detour at the vehicle's off-route speed, plus a buffer.
+              detourMin: Math.round((proj.offRouteKm * 2 * 60) / offKmh) + 2,
             };
           })
           .filter((s) => s.offRouteKm <= 12)
@@ -595,9 +609,19 @@ export default function App() {
     setToText('');
     setFromPick(null);
     setToPick(null);
+    endLive();
     routeCalcRef.current = null;
     activeLibraryIdRef.current = null;
     clearCurrentTrip();
+  }
+
+  function changeVehicle(v: Vehicle) {
+    if (v === vehicle) return;
+    vehicleRef.current = v;
+    setVehicleState(v);
+    setVehicle(v);
+    // Re-route immediately if a trip is already on screen.
+    if (route && !busy) void findStops();
   }
 
   function toggleCat(id: CategoryId) {
@@ -696,6 +720,106 @@ export default function App() {
       (e: Error) => setError(e.message),
     );
   }
+
+  function startLive() {
+    if (!route) return;
+    announcedRef.current = new Set();
+    setLivePos(null);
+    setLiveFollow(true);
+    setError(null);
+    setNotice(null);
+    setLiveOn(true);
+  }
+
+  function endLive() {
+    setLiveOn(false);
+    setLivePos(null);
+  }
+
+  // Follow the device position while live drive is on. High accuracy (we want
+  // the GPS chip when driving), and a best-effort screen wake lock so the phone
+  // doesn't sleep mid-trip. watchPosition keeps firing on its own — transient
+  // errors are ignored; only a denied permission ends the mode.
+  useEffect(() => {
+    if (!liveOn) return;
+    if (!navigator.geolocation) {
+      setError(t('liveNoGeo'));
+      setLiveOn(false);
+      return;
+    }
+    let wakeLock: { release?: () => Promise<void> } | null = null;
+    const wl = (navigator as unknown as { wakeLock?: { request: (t: string) => Promise<any> } }).wakeLock;
+    if (wl?.request) wl.request('screen').then((w) => (wakeLock = w)).catch(() => {});
+    const id = navigator.geolocation.watchPosition(
+      (pos) => {
+        setLivePos({
+          lat: pos.coords.latitude,
+          lng: pos.coords.longitude,
+          heading: pos.coords.heading,
+          accuracy: pos.coords.accuracy,
+        });
+      },
+      (err) => {
+        if (err.code === err.PERMISSION_DENIED) {
+          setError(t('liveBlocked'));
+          setLiveOn(false);
+        }
+      },
+      { enableHighAccuracy: true, maximumAge: 2000, timeout: 20000 },
+    );
+    return () => {
+      navigator.geolocation.clearWatch(id);
+      void wakeLock?.release?.().catch(() => {});
+    };
+  }, [liveOn]);
+
+  // Buzz + notice the first time we come within ~400 m of each planned stop.
+  useEffect(() => {
+    if (!liveOn || !livePos) return;
+    for (const s of plan) {
+      if (announcedRef.current.has(s.id)) continue;
+      if (haversineKm(livePos, s) <= 0.4) {
+        announcedRef.current.add(s.id);
+        setNotice(`📍 ${t('liveArriving', { name: s.name })}`);
+        navigator.vibrate?.([120, 60, 120]);
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [livePos, liveOn]);
+
+  // Live HUD figures: project the position onto the route to get progress, then
+  // distance/ETA to the next planned stop ahead and to the destination. ETA uses
+  // the route's own average speed so it agrees with the planned drive time.
+  const liveNav = useMemo(() => {
+    if (!liveOn) return null;
+    const destName = shortName(toText || routeLabel.split('→')[1]?.trim() || '') || t('liveDest');
+    if (!livePos) return { pos: null, primary: t('liveWaiting'), primaryMeta: '', secondary: '', offRoute: false };
+    const calc = routeCalcRef.current;
+    if (!calc || !route) return { pos: livePos, primary: `🏁 ${destName}`, primaryMeta: '', secondary: '', offRoute: false };
+    const proj = projectOntoRoute(livePos, calc.calcRoute, calc.cum);
+    const avgKmh = route.durationMin > 0 ? route.distanceKm / (route.durationMin / 60) : 60;
+    const eta = (km: number) => fmtDur((km / avgKmh) * 60);
+    const destKm = Math.max(0, route.distanceKm - proj.alongKm);
+    const offRoute = proj.offRouteKm > 0.5;
+    const next = plan.filter((s) => s.alongKm >= proj.alongKm - 0.3).sort((a, b) => a.alongKm - b.alongKm)[0];
+    if (next) {
+      const nextKm = Math.max(0, next.alongKm - proj.alongKm);
+      return {
+        pos: livePos,
+        primary: `🎯 ${next.name}`,
+        primaryMeta: `${fmtDist(nextKm, units)} · ${t('liveEta')} ${eta(nextKm)}`,
+        secondary: `🏁 ${destName} · ${fmtDist(destKm, units)} · ${eta(destKm)}`,
+        offRoute,
+      };
+    }
+    return {
+      pos: livePos,
+      primary: `🏁 ${destName}`,
+      primaryMeta: `${fmtDist(destKm, units)} · ${t('liveEta')} ${eta(destKm)}`,
+      secondary: '',
+      offRoute,
+    };
+  }, [liveOn, livePos, plan, route, units, toText, routeLabel]);
 
   return (
     <div className="app">
@@ -800,6 +924,25 @@ export default function App() {
                 setToPick({ lat: p.lat, lng: p.lng });
               }}
             />
+            <div className="vehicle-select" role="group" aria-label={t('vehicle')}>
+              {VEHICLES.map((v) => {
+                const locked = v.id !== 'car' && !hasGeoapify();
+                return (
+                  <button
+                    key={v.id}
+                    type="button"
+                    className={`veh-btn${vehicle === v.id ? ' active' : ''}`}
+                    aria-pressed={vehicle === v.id}
+                    aria-label={t(('veh_' + v.id) as 'veh_car')}
+                    title={locked ? t('vehNeedsKey') : t(('veh_' + v.id) as 'veh_car')}
+                    disabled={locked}
+                    onClick={() => changeVehicle(v.id)}
+                  >
+                    {v.icon}
+                  </button>
+                );
+              })}
+            </div>
             <button type="submit" className={`go-btn${busy ? ' busy' : ''}`} disabled={!!busy || !fromText.trim() || !toText.trim()}>
               {busy ?? t('find')}
             </button>
@@ -934,6 +1077,11 @@ export default function App() {
                 With your {plan.length} stop{plan.length > 1 ? 's' : ''}: ≈{' '}
                 {fmtDur(route.durationMin + planExtraMin)} total (+{fmtDur(planExtraMin)})
               </div>
+            )}
+            {!liveOn && (
+              <button type="button" className="summary-live" onClick={startLive}>
+                ▶ {t('liveDrive')}
+              </button>
             )}
             {stops.length > 0 && (
               <label className="ahead">
@@ -1193,6 +1341,18 @@ export default function App() {
         onPickPoint={pickAddPoint}
         pinPreview={addPin}
         lang={lang}
+        live={{
+          on: liveOn,
+          follow: liveFollow,
+          pos: liveNav?.pos ?? null,
+          primary: liveNav?.primary ?? '',
+          primaryMeta: liveNav?.primaryMeta ?? '',
+          secondary: liveNav?.secondary ?? '',
+          offRoute: liveNav?.offRoute ?? false,
+          onRecenter: () => setLiveFollow(true),
+          onEnd: endLive,
+          onPan: () => setLiveFollow(false),
+        }}
       />
     </div>
   );

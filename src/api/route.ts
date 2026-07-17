@@ -1,4 +1,5 @@
 import type { LatLng } from '../lib/geo';
+import type { Vehicle } from '../lib/vehicle';
 
 export interface RouteResult {
   coords: LatLng[];
@@ -6,9 +7,10 @@ export interface RouteResult {
   durationMin: number;
 }
 
-export async function fetchRoute(from: LatLng, to: LatLng): Promise<RouteResult> {
+export async function fetchRoute(from: LatLng, to: LatLng, vehicle: Vehicle = 'car'): Promise<RouteResult> {
   const { hasGeoapify, geoapifyRoute } = await import('./geoapify');
-  if (hasGeoapify()) return geoapifyRoute(from, to);
+  if (hasGeoapify()) return geoapifyRoute(from, to, vehicle);
+  // The free OSRM demo only serves the car profile; non-car needs Geoapify.
   const url =
     `https://router.project-osrm.org/route/v1/driving/` +
     `${from.lng},${from.lat};${to.lng},${to.lat}?overview=full&geometries=geojson`;

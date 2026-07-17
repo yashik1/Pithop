@@ -96,6 +96,22 @@ const en = {
   hintBody:
     "Enter where you're driving from and to. Pithop maps your route and finds viewpoints, quirky attractions, nature, history and food along the way.",
   language: 'Language',
+  vehicle: 'Vehicle',
+  veh_car: 'Car',
+  veh_truck: 'Truck',
+  veh_motorcycle: 'Motorcycle',
+  veh_bike: 'Bicycle',
+  vehNeedsKey: 'Needs the Geoapify key — only cars route on the free server',
+  liveDrive: 'Drive live on the map',
+  liveWaiting: 'Getting your location…',
+  liveEta: 'ETA',
+  liveEnd: 'End',
+  liveRecenter: 'Re-centre on me',
+  liveOffRoute: 'Off the planned route',
+  liveArriving: 'Approaching {name}',
+  liveDest: 'Destination',
+  liveNoGeo: 'Live drive needs location access, which this browser does not support.',
+  liveBlocked: 'Location is blocked — allow it via the icon in your address bar to drive live.',
 };
 
 export type TKey = keyof typeof en;
@@ -117,7 +133,7 @@ const dicts: Partial<Record<Lang, Partial<Record<TKey, string>>>> = {
     addToTrip: 'Añadir al viaje', removeFromTrip: 'Quitar del viaje', bookTickets: 'Reservar entradas', gasCashback: 'Reembolso de gasolina', report: 'Reportar', addedBy: 'Añadido por {name}', travellerTip: 'Consejo de viajero',
     signInPrompt: 'Inicia sesión para añadir un lugar — mantiene la comunidad fiable.', continueGoogle: 'Continuar con Google', orSep: 'o', email: 'Correo', password: 'Contraseña', passwordNew: 'Crea una contraseña', signIn: 'Iniciar sesión', createAccount: 'Crear cuenta', newHere: '¿Nuevo? Crea una cuenta', haveAccount: '¿Ya tienes cuenta? Inicia sesión', signedInAs: 'Sesión iniciada como', signOut: 'Cerrar sesión',
     offlineSaved: 'Estás sin conexión — mostrando tu viaje guardado.', thanksAdded: 'Gracias — tu lugar ya es visible para todos los viajeros.', tryLabel: 'Prueba:',
-    hintBody: 'Indica desde y hasta dónde conduces. Pithop traza tu ruta y encuentra miradores, atracciones curiosas, naturaleza, historia y comida por el camino.', language: 'Idioma',
+    hintBody: 'Indica desde y hasta dónde conduces. Pithop traza tu ruta y encuentra miradores, atracciones curiosas, naturaleza, historia y comida por el camino.', language: 'Idioma', vehicle: 'Vehículo', veh_car: 'Coche', veh_truck: 'Camión', veh_motorcycle: 'Motocicleta', veh_bike: 'Bicicleta',
   },
   fr: {
     tagline: 'Des arrêts sympas, des pépites et des pauses sur votre route',
@@ -133,7 +149,7 @@ const dicts: Partial<Record<Lang, Partial<Record<TKey, string>>>> = {
     addToTrip: 'Ajouter au trajet', removeFromTrip: 'Retirer du trajet', bookTickets: 'Réserver des billets', gasCashback: 'Remise carburant', report: 'Signaler', addedBy: 'Ajouté par {name}', travellerTip: 'Conseil de voyageur',
     signInPrompt: 'Connectez-vous pour ajouter un lieu — cela garde la communauté fiable.', continueGoogle: 'Continuer avec Google', orSep: 'ou', email: 'E-mail', password: 'Mot de passe', passwordNew: 'Créez un mot de passe', signIn: 'Se connecter', createAccount: 'Créer un compte', newHere: 'Nouveau ? Créez un compte', haveAccount: 'Déjà un compte ? Connectez-vous', signedInAs: 'Connecté en tant que', signOut: 'Se déconnecter',
     offlineSaved: 'Vous êtes hors ligne — affichage de votre voyage enregistré.', thanksAdded: 'Merci — votre lieu est maintenant visible par tous les voyageurs.', tryLabel: 'Essayez :',
-    hintBody: 'Indiquez votre départ et votre arrivée. Pithop trace votre itinéraire et trouve points de vue, attractions insolites, nature, histoire et restauration en chemin.', language: 'Langue',
+    hintBody: 'Indiquez votre départ et votre arrivée. Pithop trace votre itinéraire et trouve points de vue, attractions insolites, nature, histoire et restauration en chemin.', language: 'Langue', vehicle: 'Véhicule', veh_car: 'Voiture', veh_truck: 'Camion', veh_motorcycle: 'Moto', veh_bike: 'Vélo',
   },
   de: {
     tagline: 'Coole Stopps, Geheimtipps und Pausen auf deiner Fahrt',
@@ -149,7 +165,7 @@ const dicts: Partial<Record<Lang, Partial<Record<TKey, string>>>> = {
     addToTrip: 'Zur Reise hinzufügen', removeFromTrip: 'Aus Reise entfernen', bookTickets: 'Tickets buchen', gasCashback: 'Tank-Cashback', report: 'Melden', addedBy: 'Hinzugefügt von {name}', travellerTip: 'Reisetipp',
     signInPrompt: 'Melde dich an, um einen Ort hinzuzufügen — das hält die Community vertrauenswürdig.', continueGoogle: 'Mit Google fortfahren', orSep: 'oder', email: 'E-Mail', password: 'Passwort', passwordNew: 'Passwort erstellen', signIn: 'Anmelden', createAccount: 'Konto erstellen', newHere: 'Neu hier? Konto erstellen', haveAccount: 'Schon ein Konto? Anmelden', signedInAs: 'Angemeldet als', signOut: 'Abmelden',
     offlineSaved: 'Du bist offline — zeige deine gespeicherte Reise.', thanksAdded: 'Danke — dein Ort ist jetzt für alle Reisenden sichtbar.', tryLabel: 'Probier:',
-    hintBody: 'Gib ein, von wo nach wo du fährst. Pithop zeichnet deine Route und findet Aussichtspunkte, kuriose Attraktionen, Natur, Geschichte und Essen am Weg.', language: 'Sprache',
+    hintBody: 'Gib ein, von wo nach wo du fährst. Pithop zeichnet deine Route und findet Aussichtspunkte, kuriose Attraktionen, Natur, Geschichte und Essen am Weg.', language: 'Sprache', vehicle: 'Fahrzeug', veh_car: 'Auto', veh_truck: 'LKW', veh_motorcycle: 'Motorrad', veh_bike: 'Fahrrad',
   },
   pt: {
     tagline: 'Paradas divertidas, joias escondidas e pausas na sua viagem',
@@ -165,7 +181,7 @@ const dicts: Partial<Record<Lang, Partial<Record<TKey, string>>>> = {
     addToTrip: 'Adicionar à viagem', removeFromTrip: 'Remover da viagem', bookTickets: 'Reservar bilhetes', gasCashback: 'Reembolso de combustível', report: 'Denunciar', addedBy: 'Adicionado por {name}', travellerTip: 'Dica de viajante',
     signInPrompt: 'Inicie sessão para adicionar um lugar — mantém a comunidade fiável.', continueGoogle: 'Continuar com o Google', orSep: 'ou', email: 'E-mail', password: 'Palavra-passe', passwordNew: 'Crie uma palavra-passe', signIn: 'Entrar', createAccount: 'Criar conta', newHere: 'Novo aqui? Crie uma conta', haveAccount: 'Já tem conta? Entrar', signedInAs: 'Sessão iniciada como', signOut: 'Sair',
     offlineSaved: 'Está offline — a mostrar a sua viagem guardada.', thanksAdded: 'Obrigado — o seu lugar já é visível para todos os viajantes.', tryLabel: 'Experimente:',
-    hintBody: 'Indique de onde e para onde vai. O Pithop traça a rota e encontra miradouros, atrações curiosas, natureza, história e comida pelo caminho.', language: 'Idioma',
+    hintBody: 'Indique de onde e para onde vai. O Pithop traça a rota e encontra miradouros, atrações curiosas, natureza, história e comida pelo caminho.', language: 'Idioma', vehicle: 'Veículo', veh_car: 'Carro', veh_truck: 'Camião', veh_motorcycle: 'Motocicleta', veh_bike: 'Bicicleta',
   },
   it: {
     tagline: 'Soste divertenti, gemme nascoste e pause lungo il viaggio',
@@ -181,7 +197,7 @@ const dicts: Partial<Record<Lang, Partial<Record<TKey, string>>>> = {
     addToTrip: 'Aggiungi al viaggio', removeFromTrip: 'Rimuovi dal viaggio', bookTickets: 'Prenota biglietti', gasCashback: 'Rimborso carburante', report: 'Segnala', addedBy: 'Aggiunto da {name}', travellerTip: 'Consiglio di viaggio',
     signInPrompt: 'Accedi per aggiungere un luogo — mantiene la community affidabile.', continueGoogle: 'Continua con Google', orSep: 'o', email: 'Email', password: 'Password', passwordNew: 'Crea una password', signIn: 'Accedi', createAccount: 'Crea account', newHere: 'Nuovo? Crea un account', haveAccount: 'Hai un account? Accedi', signedInAs: 'Accesso come', signOut: 'Esci',
     offlineSaved: 'Sei offline — mostro il tuo viaggio salvato.', thanksAdded: 'Grazie — il tuo luogo è ora visibile a tutti i viaggiatori.', tryLabel: 'Prova:',
-    hintBody: 'Inserisci da dove a dove guidi. Pithop traccia il percorso e trova punti panoramici, attrazioni curiose, natura, storia e cibo lungo la strada.', language: 'Lingua',
+    hintBody: 'Inserisci da dove a dove guidi. Pithop traccia il percorso e trova punti panoramici, attrazioni curiose, natura, storia e cibo lungo la strada.', language: 'Lingua', vehicle: 'Veicolo', veh_car: 'Auto', veh_truck: 'Camion', veh_motorcycle: 'Moto', veh_bike: 'Bicicletta',
   },
   nl: {
     tagline: 'Leuke stops, verborgen pareltjes en pauzes onderweg',
@@ -197,7 +213,7 @@ const dicts: Partial<Record<Lang, Partial<Record<TKey, string>>>> = {
     addToTrip: 'Aan rit toevoegen', removeFromTrip: 'Uit rit verwijderen', bookTickets: 'Tickets boeken', gasCashback: 'Brandstof-cashback', report: 'Melden', addedBy: 'Toegevoegd door {name}', travellerTip: 'Reizigerstip',
     signInPrompt: 'Log in om een plek toe te voegen — zo blijft de community betrouwbaar.', continueGoogle: 'Doorgaan met Google', orSep: 'of', email: 'E-mail', password: 'Wachtwoord', passwordNew: 'Maak een wachtwoord', signIn: 'Inloggen', createAccount: 'Account maken', newHere: 'Nieuw hier? Account maken', haveAccount: 'Al een account? Inloggen', signedInAs: 'Ingelogd als', signOut: 'Uitloggen',
     offlineSaved: 'Je bent offline — je opgeslagen rit wordt getoond.', thanksAdded: 'Bedankt — je plek is nu zichtbaar voor alle reizigers.', tryLabel: 'Probeer:',
-    hintBody: 'Vul in van en naar waar je rijdt. Pithop tekent je route en vindt uitzichtpunten, eigenzinnige attracties, natuur, geschiedenis en eten onderweg.', language: 'Taal',
+    hintBody: 'Vul in van en naar waar je rijdt. Pithop tekent je route en vindt uitzichtpunten, eigenzinnige attracties, natuur, geschiedenis en eten onderweg.', language: 'Taal', vehicle: 'Voertuig', veh_car: 'Auto', veh_truck: 'Vrachtwagen', veh_motorcycle: 'Motor', veh_bike: 'Fiets',
   },
   ru: {
     tagline: 'Интересные остановки, скрытые жемчужины и паузы в пути',
@@ -213,7 +229,7 @@ const dicts: Partial<Record<Lang, Partial<Record<TKey, string>>>> = {
     addToTrip: 'Добавить в поездку', removeFromTrip: 'Убрать из поездки', bookTickets: 'Купить билеты', gasCashback: 'Кэшбэк за топливо', report: 'Пожаловаться', addedBy: 'Добавил {name}', travellerTip: 'Совет путешественника',
     signInPrompt: 'Войдите, чтобы добавить место — это делает сообщество надёжным.', continueGoogle: 'Продолжить с Google', orSep: 'или', email: 'Эл. почта', password: 'Пароль', passwordNew: 'Придумайте пароль', signIn: 'Войти', createAccount: 'Создать аккаунт', newHere: 'Впервые? Создайте аккаунт', haveAccount: 'Уже есть аккаунт? Войти', signedInAs: 'Вы вошли как', signOut: 'Выйти',
     offlineSaved: 'Вы офлайн — показываем сохранённую поездку.', thanksAdded: 'Спасибо — ваше место теперь видно всем путешественникам.', tryLabel: 'Попробуйте:',
-    hintBody: 'Укажите, откуда и куда едете. Pithop построит маршрут и найдёт смотровые площадки, необычные достопримечательности, природу, историю и еду по пути.', language: 'Язык',
+    hintBody: 'Укажите, откуда и куда едете. Pithop построит маршрут и найдёт смотровые площадки, необычные достопримечательности, природу, историю и еду по пути.', language: 'Язык', vehicle: 'Транспорт', veh_car: 'Автомобиль', veh_truck: 'Грузовик', veh_motorcycle: 'Мотоцикл', veh_bike: 'Велосипед',
   },
   uk: {
     tagline: 'Цікаві зупинки, приховані перлини та паузи в дорозі',
@@ -229,7 +245,7 @@ const dicts: Partial<Record<Lang, Partial<Record<TKey, string>>>> = {
     addToTrip: 'Додати до поїздки', removeFromTrip: 'Прибрати з поїздки', bookTickets: 'Купити квитки', gasCashback: 'Кешбек за пальне', report: 'Поскаржитися', addedBy: 'Додав {name}', travellerTip: 'Порада мандрівника',
     signInPrompt: 'Увійдіть, щоб додати місце — це робить спільноту надійною.', continueGoogle: 'Продовжити з Google', orSep: 'або', email: 'Ел. пошта', password: 'Пароль', passwordNew: 'Придумайте пароль', signIn: 'Увійти', createAccount: 'Створити акаунт', newHere: 'Уперше? Створіть акаунт', haveAccount: 'Вже є акаунт? Увійти', signedInAs: 'Ви увійшли як', signOut: 'Вийти',
     offlineSaved: 'Ви офлайн — показуємо збережену поїздку.', thanksAdded: 'Дякуємо — ваше місце тепер бачать усі мандрівники.', tryLabel: 'Спробуйте:',
-    hintBody: 'Вкажіть, звідки й куди їдете. Pithop побудує маршрут і знайде оглядові точки, незвичні атракції, природу, історію та їжу дорогою.', language: 'Мова',
+    hintBody: 'Вкажіть, звідки й куди їдете. Pithop побудує маршрут і знайде оглядові точки, незвичні атракції, природу, історію та їжу дорогою.', language: 'Мова', vehicle: 'Транспорт', veh_car: 'Автомобіль', veh_truck: 'Вантажівка', veh_motorcycle: 'Мотоцикл', veh_bike: 'Велосипед',
   },
   pl: {
     tagline: 'Ciekawe przystanki, ukryte perełki i przerwy w podróży',
@@ -245,7 +261,7 @@ const dicts: Partial<Record<Lang, Partial<Record<TKey, string>>>> = {
     addToTrip: 'Dodaj do podróży', removeFromTrip: 'Usuń z podróży', bookTickets: 'Zarezerwuj bilety', gasCashback: 'Zwrot za paliwo', report: 'Zgłoś', addedBy: 'Dodane przez {name}', travellerTip: 'Porada podróżnika',
     signInPrompt: 'Zaloguj się, aby dodać miejsce — to utrzymuje wiarygodność społeczności.', continueGoogle: 'Kontynuuj z Google', orSep: 'lub', email: 'E-mail', password: 'Hasło', passwordNew: 'Utwórz hasło', signIn: 'Zaloguj się', createAccount: 'Utwórz konto', newHere: 'Nowy? Utwórz konto', haveAccount: 'Masz konto? Zaloguj się', signedInAs: 'Zalogowano jako', signOut: 'Wyloguj',
     offlineSaved: 'Jesteś offline — pokazujemy zapisaną podróż.', thanksAdded: 'Dziękujemy — Twoje miejsce jest teraz widoczne dla wszystkich.', tryLabel: 'Spróbuj:',
-    hintBody: 'Podaj skąd i dokąd jedziesz. Pithop wyznaczy trasę i znajdzie punkty widokowe, ciekawe atrakcje, przyrodę, historię i jedzenie po drodze.', language: 'Język',
+    hintBody: 'Podaj skąd i dokąd jedziesz. Pithop wyznaczy trasę i znajdzie punkty widokowe, ciekawe atrakcje, przyrodę, historię i jedzenie po drodze.', language: 'Język', vehicle: 'Pojazd', veh_car: 'Samochód', veh_truck: 'Ciężarówka', veh_motorcycle: 'Motocykl', veh_bike: 'Rower',
   },
   tr: {
     tagline: 'Yol boyunca eğlenceli duraklar, gizli cevherler ve molalar',
@@ -261,7 +277,7 @@ const dicts: Partial<Record<Lang, Partial<Record<TKey, string>>>> = {
     addToTrip: 'Geziye ekle', removeFromTrip: 'Geziden çıkar', bookTickets: 'Bilet al', gasCashback: 'Yakıt iadesi', report: 'Bildir', addedBy: 'Ekleyen: {name}', travellerTip: 'Gezgin ipucu',
     signInPrompt: 'Yer eklemek için giriş yap — bu topluluğu güvenilir tutar.', continueGoogle: 'Google ile devam et', orSep: 'veya', email: 'E-posta', password: 'Şifre', passwordNew: 'Bir şifre oluştur', signIn: 'Giriş yap', createAccount: 'Hesap oluştur', newHere: 'Yeni misin? Hesap oluştur', haveAccount: 'Hesabın var mı? Giriş yap', signedInAs: 'Giriş yapıldı:', signOut: 'Çıkış yap',
     offlineSaved: 'Çevrimdışısın — kayıtlı gezin gösteriliyor.', thanksAdded: 'Teşekkürler — yerin artık tüm gezginlere görünüyor.', tryLabel: 'Deneyin:',
-    hintBody: 'Nereden nereye gittiğini gir. Pithop rotanı çizer ve yol boyunca manzara noktaları, ilginç yerler, doğa, tarih ve yemek bulur.', language: 'Dil',
+    hintBody: 'Nereden nereye gittiğini gir. Pithop rotanı çizer ve yol boyunca manzara noktaları, ilginç yerler, doğa, tarih ve yemek bulur.', language: 'Dil', vehicle: 'Araç', veh_car: 'Araba', veh_truck: 'Kamyon', veh_motorcycle: 'Motosiklet', veh_bike: 'Bisiklet',
   },
   ar: {
     tagline: 'محطات ممتعة وكنوز خفية واستراحات على طول رحلتك',
@@ -277,7 +293,7 @@ const dicts: Partial<Record<Lang, Partial<Record<TKey, string>>>> = {
     addToTrip: 'أضف إلى الرحلة', removeFromTrip: 'أزل من الرحلة', bookTickets: 'احجز التذاكر', gasCashback: 'استرداد الوقود', report: 'إبلاغ', addedBy: 'أضافه {name}', travellerTip: 'نصيحة مسافر',
     signInPrompt: 'سجّل الدخول لإضافة مكان — هذا يحافظ على مصداقية المجتمع.', continueGoogle: 'المتابعة عبر Google', orSep: 'أو', email: 'البريد الإلكتروني', password: 'كلمة المرور', passwordNew: 'أنشئ كلمة مرور', signIn: 'تسجيل الدخول', createAccount: 'إنشاء حساب', newHere: 'جديد هنا؟ أنشئ حسابًا', haveAccount: 'لديك حساب؟ سجّل الدخول', signedInAs: 'مسجّل الدخول باسم', signOut: 'تسجيل الخروج',
     offlineSaved: 'أنت غير متصل — عرض رحلتك المحفوظة.', thanksAdded: 'شكرًا — مكانك الآن ظاهر لكل المسافرين.', tryLabel: 'جرّب:',
-    hintBody: 'أدخل من أين وإلى أين تقود. يرسم Pithop مسارك ويجد نقاط مشاهدة ومعالم طريفة وطبيعة وتاريخًا وطعامًا على الطريق.', language: 'اللغة',
+    hintBody: 'أدخل من أين وإلى أين تقود. يرسم Pithop مسارك ويجد نقاط مشاهدة ومعالم طريفة وطبيعة وتاريخًا وطعامًا على الطريق.', language: 'اللغة', vehicle: 'المركبة', veh_car: 'سيارة', veh_truck: 'شاحنة', veh_motorcycle: 'دراجة نارية', veh_bike: 'دراجة',
   },
   hi: {
     tagline: 'रास्ते भर मज़ेदार पड़ाव, छुपे रत्न और ब्रेक',
@@ -293,7 +309,7 @@ const dicts: Partial<Record<Lang, Partial<Record<TKey, string>>>> = {
     addToTrip: 'यात्रा में जोड़ें', removeFromTrip: 'यात्रा से हटाएँ', bookTickets: 'टिकट बुक करें', gasCashback: 'ईंधन कैशबैक', report: 'रिपोर्ट करें', addedBy: '{name} द्वारा जोड़ा गया', travellerTip: 'यात्री सुझाव',
     signInPrompt: 'जगह जोड़ने के लिए साइन इन करें — इससे समुदाय भरोसेमंद रहता है।', continueGoogle: 'Google से जारी रखें', orSep: 'या', email: 'ईमेल', password: 'पासवर्ड', passwordNew: 'पासवर्ड बनाएँ', signIn: 'साइन इन', createAccount: 'खाता बनाएँ', newHere: 'नए हैं? खाता बनाएँ', haveAccount: 'खाता है? साइन इन करें', signedInAs: 'साइन इन:', signOut: 'साइन आउट',
     offlineSaved: 'आप ऑफ़लाइन हैं — आपकी सहेजी यात्रा दिखाई जा रही है।', thanksAdded: 'धन्यवाद — आपकी जगह अब सभी यात्रियों को दिखेगी।', tryLabel: 'आज़माएँ:',
-    hintBody: 'बताएँ कहाँ से कहाँ जा रहे हैं। Pithop आपका मार्ग बनाता है और रास्ते में व्यू पॉइंट, अनोखे आकर्षण, प्रकृति, इतिहास और खाना खोजता है।', language: 'भाषा',
+    hintBody: 'बताएँ कहाँ से कहाँ जा रहे हैं। Pithop आपका मार्ग बनाता है और रास्ते में व्यू पॉइंट, अनोखे आकर्षण, प्रकृति, इतिहास और खाना खोजता है।', language: 'भाषा', vehicle: 'वाहन', veh_car: 'कार', veh_truck: 'ट्रक', veh_motorcycle: 'मोटरसाइकिल', veh_bike: 'साइकिल',
   },
   id: {
     tagline: 'Perhentian seru, permata tersembunyi, dan istirahat di perjalanan',
@@ -309,7 +325,7 @@ const dicts: Partial<Record<Lang, Partial<Record<TKey, string>>>> = {
     addToTrip: 'Tambah ke perjalanan', removeFromTrip: 'Hapus dari perjalanan', bookTickets: 'Pesan tiket', gasCashback: 'Cashback BBM', report: 'Laporkan', addedBy: 'Ditambahkan oleh {name}', travellerTip: 'Tips pelancong',
     signInPrompt: 'Masuk untuk menambah tempat — menjaga komunitas tepercaya.', continueGoogle: 'Lanjutkan dengan Google', orSep: 'atau', email: 'Email', password: 'Kata sandi', passwordNew: 'Buat kata sandi', signIn: 'Masuk', createAccount: 'Buat akun', newHere: 'Baru di sini? Buat akun', haveAccount: 'Sudah punya akun? Masuk', signedInAs: 'Masuk sebagai', signOut: 'Keluar',
     offlineSaved: 'Anda offline — menampilkan perjalanan tersimpan.', thanksAdded: 'Terima kasih — tempat Anda kini terlihat oleh semua pelancong.', tryLabel: 'Coba:',
-    hintBody: 'Masukkan dari dan ke mana Anda berkendara. Pithop memetakan rute dan menemukan titik pandang, atraksi unik, alam, sejarah, dan makanan di jalan.', language: 'Bahasa',
+    hintBody: 'Masukkan dari dan ke mana Anda berkendara. Pithop memetakan rute dan menemukan titik pandang, atraksi unik, alam, sejarah, dan makanan di jalan.', language: 'Bahasa', vehicle: 'Kendaraan', veh_car: 'Mobil', veh_truck: 'Truk', veh_motorcycle: 'Motor', veh_bike: 'Sepeda',
   },
   vi: {
     tagline: 'Điểm dừng thú vị, viên ngọc ẩn và những lần nghỉ trên đường',
@@ -325,7 +341,7 @@ const dicts: Partial<Record<Lang, Partial<Record<TKey, string>>>> = {
     addToTrip: 'Thêm vào chuyến', removeFromTrip: 'Bỏ khỏi chuyến', bookTickets: 'Đặt vé', gasCashback: 'Hoàn tiền xăng', report: 'Báo cáo', addedBy: 'Được thêm bởi {name}', travellerTip: 'Mẹo du lịch',
     signInPrompt: 'Đăng nhập để thêm địa điểm — giúp cộng đồng đáng tin cậy.', continueGoogle: 'Tiếp tục với Google', orSep: 'hoặc', email: 'Email', password: 'Mật khẩu', passwordNew: 'Tạo mật khẩu', signIn: 'Đăng nhập', createAccount: 'Tạo tài khoản', newHere: 'Mới đến? Tạo tài khoản', haveAccount: 'Đã có tài khoản? Đăng nhập', signedInAs: 'Đăng nhập với tên', signOut: 'Đăng xuất',
     offlineSaved: 'Bạn đang ngoại tuyến — hiển thị chuyến đã lưu.', thanksAdded: 'Cảm ơn — địa điểm của bạn giờ hiển thị với mọi du khách.', tryLabel: 'Thử:',
-    hintBody: 'Nhập điểm đi và điểm đến. Pithop vẽ lộ trình và tìm điểm ngắm cảnh, điểm tham quan độc đáo, thiên nhiên, lịch sử và ẩm thực trên đường.', language: 'Ngôn ngữ',
+    hintBody: 'Nhập điểm đi và điểm đến. Pithop vẽ lộ trình và tìm điểm ngắm cảnh, điểm tham quan độc đáo, thiên nhiên, lịch sử và ẩm thực trên đường.', language: 'Ngôn ngữ', vehicle: 'Phương tiện', veh_car: 'Ô tô', veh_truck: 'Xe tải', veh_motorcycle: 'Xe máy', veh_bike: 'Xe đạp',
   },
   zh: {
     tagline: '旅途中的有趣停靠、隐藏景点与休息点',
@@ -341,7 +357,7 @@ const dicts: Partial<Record<Lang, Partial<Record<TKey, string>>>> = {
     addToTrip: '加入行程', removeFromTrip: '移出行程', bookTickets: '预订门票', gasCashback: '加油返现', report: '举报', addedBy: '由 {name} 添加', travellerTip: '旅行者提示',
     signInPrompt: '登录后可添加地点 — 让社区更可信。', continueGoogle: '使用 Google 继续', orSep: '或', email: '邮箱', password: '密码', passwordNew: '创建密码', signIn: '登录', createAccount: '创建账户', newHere: '新用户？创建账户', haveAccount: '已有账户？登录', signedInAs: '已登录：', signOut: '退出',
     offlineSaved: '你已离线 — 显示已保存的行程。', thanksAdded: '谢谢 — 你的地点现在对所有旅行者可见。', tryLabel: '试试：',
-    hintBody: '输入你的出发地和目的地。Pithop 会规划路线，并找出沿途的观景点、有趣景点、自然、历史与美食。', language: '语言',
+    hintBody: '输入你的出发地和目的地。Pithop 会规划路线，并找出沿途的观景点、有趣景点、自然、历史与美食。', language: '语言', vehicle: '车辆', veh_car: '汽车', veh_truck: '卡车', veh_motorcycle: '摩托车', veh_bike: '自行车',
   },
   ja: {
     tagline: 'ドライブ途中の楽しい立ち寄り・隠れた名所・休憩',
@@ -357,7 +373,7 @@ const dicts: Partial<Record<Lang, Partial<Record<TKey, string>>>> = {
     addToTrip: '旅行に追加', removeFromTrip: '旅行から削除', bookTickets: 'チケット予約', gasCashback: '給油キャッシュバック', report: '報告', addedBy: '{name} が追加', travellerTip: '旅行者のヒント',
     signInPrompt: '場所を追加するにはサインイン — コミュニティの信頼を保ちます。', continueGoogle: 'Google で続行', orSep: 'または', email: 'メール', password: 'パスワード', passwordNew: 'パスワードを作成', signIn: 'サインイン', createAccount: 'アカウント作成', newHere: '初めて？アカウント作成', haveAccount: 'アカウントあり？サインイン', signedInAs: 'サインイン中：', signOut: 'サインアウト',
     offlineSaved: 'オフラインです — 保存した旅行を表示します。', thanksAdded: 'ありがとうございます — あなたの場所がすべての旅行者に表示されます。', tryLabel: 'お試し：',
-    hintBody: '出発地と目的地を入力してください。Pithop がルートを描き、途中の展望スポット、ユニークな名所、自然、歴史、グルメを見つけます。', language: '言語',
+    hintBody: '出発地と目的地を入力してください。Pithop がルートを描き、途中の展望スポット、ユニークな名所、自然、歴史、グルメを見つけます。', language: '言語', vehicle: '車両', veh_car: '車', veh_truck: 'トラック', veh_motorcycle: 'バイク', veh_bike: '自転車',
   },
   ko: {
     tagline: '드라이브 중 즐거운 정차, 숨은 명소, 휴식',
@@ -373,7 +389,7 @@ const dicts: Partial<Record<Lang, Partial<Record<TKey, string>>>> = {
     addToTrip: '여행에 추가', removeFromTrip: '여행에서 제거', bookTickets: '티켓 예약', gasCashback: '주유 캐시백', report: '신고', addedBy: '{name} 님이 추가', travellerTip: '여행자 팁',
     signInPrompt: '장소를 추가하려면 로그인 — 커뮤니티 신뢰를 유지합니다.', continueGoogle: 'Google로 계속', orSep: '또는', email: '이메일', password: '비밀번호', passwordNew: '비밀번호 만들기', signIn: '로그인', createAccount: '계정 만들기', newHere: '처음이세요? 계정 만들기', haveAccount: '계정이 있나요? 로그인', signedInAs: '로그인:', signOut: '로그아웃',
     offlineSaved: '오프라인입니다 — 저장된 여행을 표시합니다.', thanksAdded: '감사합니다 — 장소가 이제 모든 여행자에게 표시됩니다.', tryLabel: '예시:',
-    hintBody: '출발지와 도착지를 입력하세요. Pithop가 경로를 그리고 전망 포인트, 독특한 명소, 자연, 역사, 음식을 찾아줍니다.', language: '언어',
+    hintBody: '출발지와 도착지를 입력하세요. Pithop가 경로를 그리고 전망 포인트, 독특한 명소, 자연, 역사, 음식을 찾아줍니다.', language: '언어', vehicle: '차량', veh_car: '자동차', veh_truck: '트럭', veh_motorcycle: '오토바이', veh_bike: '자전거',
   },
 };
 

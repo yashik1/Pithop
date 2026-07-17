@@ -9,6 +9,7 @@ import type { LatLng } from '../lib/geo';
 import type { Stop } from '../types';
 import { visitMinutes, type CategoryId } from '../lib/categories';
 import { describeOsm, parkingFromTags } from './overpass';
+import { VEHICLE_MAP, type Vehicle } from '../lib/vehicle';
 import type { GeocodeResult } from './geocode';
 import type { RouteResult } from './route';
 import type { PlacePick } from '../components/PlaceInput';
@@ -64,12 +65,13 @@ export async function geoapifyGeocode(query: string): Promise<GeocodeResult> {
   return { lat, lng, displayName: f.properties.formatted ?? query };
 }
 
-export async function geoapifyRoute(from: LatLng, to: LatLng): Promise<RouteResult> {
+export async function geoapifyRoute(from: LatLng, to: LatLng, vehicle: Vehicle = 'car'): Promise<RouteResult> {
+  const mode = VEHICLE_MAP[vehicle]?.geoapify ?? 'drive';
   const data = await getJson(
-    `${BASE}/v1/routing?waypoints=${from.lat},${from.lng}%7C${to.lat},${to.lng}&mode=drive&apiKey=${KEY}`,
+    `${BASE}/v1/routing?waypoints=${from.lat},${from.lng}%7C${to.lat},${to.lng}&mode=${mode}&apiKey=${KEY}`,
   );
   const f = data.features?.[0];
-  if (!f) throw new Error('No drivable route found between those places');
+  if (!f) throw new Error('No route found between those places for this vehicle');
   // Routing returns a MultiLineString with one line per leg — flatten them.
   const lines: Array<Array<[number, number]>> =
     f.geometry.type === 'MultiLineString' ? f.geometry.coordinates : [f.geometry.coordinates];
