@@ -54,18 +54,25 @@ interface LiveProps {
   onPickPoint: (p: { lat: number; lng: number }) => void;
 }
 
+// Accept only parseable http(s) URLs, returned re-serialized. External URLs
+// must never be string-interpolated into popup HTML — DOM-assign them instead.
+function httpUrl(u: string | undefined): string | null {
+  if (!u) return null;
+  try {
+    const p = new URL(u);
+    return p.protocol === 'https:' || p.protocol === 'http:' ? p.href : null;
+  } catch {
+    return null;
+  }
+}
+
 function buildPopup(stop: Stop, live: { current: LiveProps }): HTMLElement {
   const cat = CATEGORY_MAP[stop.category];
   const div = document.createElement('div');
   div.className = 'map-popup';
   // A plain Google Maps deep link for turn-by-turn navigation — no API involved.
-  const gmaps = `https://www.google.com/maps/search/?api=1&query=${stop.lat}%2C${stop.lng}`;
-  const img = stop.imageUrl ? `<img class="p-img" src="${stop.imageUrl}" alt="" />` : '';
-  const wiki = stop.wikiUrl
-    ? ` · <a class="p-link" href="${stop.wikiUrl}" target="_blank" rel="noreferrer">Wikipedia ↗</a>`
-    : '';
+  const gmaps = `https://www.google.com/maps/search/?api=1&query=${Number(stop.lat)}%2C${Number(stop.lng)}`;
   div.innerHTML = `
-    ${img}
     <div class="p-name"></div>
     ${stop.source === 'community' ? `<div class="p-community">👥 ${t('travellerTip')}</div>` : ''}
     <div class="p-desc"></div>
@@ -80,23 +87,44 @@ function buildPopup(stop: Stop, live: { current: LiveProps }): HTMLElement {
         : ''
     }
     <div class="p-todo"></div>
-    <div class="p-links"><a class="p-link" href="${gmaps}" target="_blank" rel="noreferrer">Google Maps ↗</a>${wiki}</div>
+    <div class="p-links"><a class="p-link" href="${gmaps}" target="_blank" rel="noreferrer">Google Maps ↗</a></div>
     <button type="button" class="p-add"></button>`;
   div.querySelector('.p-name')!.textContent = stop.name;
   const desc = div.querySelector<HTMLElement>('.p-desc')!;
   if (stop.description) desc.textContent = stop.description;
   else desc.remove();
   div.querySelector('.p-todo')!.textContent = `💡 ${thingsToDo(stop.kind)}`;
-  if (stop.website) {
-    // Built via DOM (not the innerHTML template) — the URL originates in raw
-    // OSM data, so it must land in href as a value, never as markup.
+  // Everything URL-shaped from external data (Wikipedia thumbnail/link, OSM
+  // website) is validated to http(s) and DOM-assigned — never interpolated
+  // into the HTML template above.
+  const imgUrl = httpUrl(stop.imageUrl);
+  if (imgUrl) {
+    const img = document.createElement('img');
+    img.className = 'p-img';
+    img.src = imgUrl;
+    img.alt = '';
+    div.prepend(img);
+  }
+  const links = div.querySelector<HTMLElement>('.p-links')!;
+  const wikiUrl = httpUrl(stop.wikiUrl);
+  if (wikiUrl) {
+    const a = document.createElement('a');
+    a.className = 'p-link';
+    a.href = wikiUrl;
+    a.target = '_blank';
+    a.rel = 'noreferrer';
+    a.textContent = 'Wikipedia ↗';
+    links.append(' · ', a);
+  }
+  const siteUrl = httpUrl(stop.website);
+  if (siteUrl) {
     const site = document.createElement('a');
     site.className = 'p-link';
-    site.href = stop.website;
+    site.href = siteUrl;
     site.target = '_blank';
     site.rel = 'noreferrer';
     site.textContent = `🌐 ${t('website')} ↗`;
-    div.querySelector('.p-links')!.prepend(site, ' · ');
+    links.prepend(site, ' · ');
   }
   if (stop.source === 'community' && stop.by) {
     // textContent (not innerHTML) — the display name is user-controlled.

@@ -426,8 +426,13 @@ export default function App() {
   }
 
   async function handleReport(s: Stop) {
-    await reportCommunityStop(s.id).catch(() => {});
-    setNotice('🚩 Reported — thank you. Places with several reports are hidden for everyone.');
+    try {
+      await reportCommunityStop(s.id);
+      setNotice('🚩 Reported — thank you. Places with several reports are hidden for everyone.');
+    } catch (e) {
+      // e.g. "Please sign in to report a place" — don't fake a success.
+      setError(e instanceof Error ? e.message : String(e));
+    }
   }
 
   // Open the whole trip (origin → planned stops → destination) as one

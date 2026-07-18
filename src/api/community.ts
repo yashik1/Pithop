@@ -92,9 +92,16 @@ export async function submitCommunityStop(sub: CommunitySubmission): Promise<Sto
 
 export async function reportCommunityStop(stopId: string): Promise<void> {
   const id = stopId.replace(/^community\//, '');
-  await fetch('/api/community', {
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+  // Reporting requires a signed-in account when auth is configured (it's
+  // moderation power) — attach the token like submissions do.
+  const token = await getAccessToken();
+  if (token) headers.Authorization = `Bearer ${token}`;
+  const res = await fetch('/api/community', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers,
     body: JSON.stringify({ action: 'report', id }),
   });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error ?? `Report failed (HTTP ${res.status})`);
 }
