@@ -17,21 +17,6 @@
   </head>
   <body>
     <p>Finishing sign-in… you can close this window.</p>
-    <script>
-      // OAuth landing page for the popup sign-in flow: hand the auth response
-      // (tokens or error, carried in the URL hash/query) back to the app
-      // window that opened this popup, then close. Target '*' because the
-      // opener may be on a different origin (www vs bare domain, preview vs
-      // prod); it only trusts a message whose source is this popup window.
-      try {
-        if (window.opener) {
-          window.opener.postMessage(
-            { type: 'pithop-auth', hash: location.hash, search: location.search },
-            '*',
-          );
-        }
-      } catch (e) {}
-      window.close();
-    </script>
+    <script src="/auth-popup.js"></script>
   </body>
 </html>

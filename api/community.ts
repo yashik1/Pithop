@@ -16,6 +16,7 @@ const MAX_POINTS = 60;
 const RADIUS_KM = 12;
 const MAX_RESULTS = 500;
 const DAILY_SUBMISSIONS_PER_IP = 10;
+const DAILY_REPORTS = 20;
 const CATEGORIES = ['fun', 'views', 'nature', 'history', 'museums', 'food', 'rest'];
 const VISIT_OPTIONS = [15, 30, 60, 120];
 const PARKING_OPTIONS = ['free', 'paid', 'none'];
@@ -70,6 +71,16 @@ async function verifyUser(authHeader: string | undefined): Promise<{ uid: string
   } catch {
     return null;
   }
+}
+
+// Client IP for best-effort anonymous rate limiting. The platform-set
+// x-real-ip wins; otherwise the LAST x-forwarded-for entry — proxies append
+// the real client address, while a spoofing client can only prepend fakes.
+function clientIp(req: any): string {
+  const real = String(req.headers?.['x-real-ip'] ?? '').trim();
+  if (real) return real;
+  const fwd = String(req.headers?.['x-forwarded-for'] ?? '');
+  return fwd.split(',').pop()?.trim() || 'unknown';
 }
 
 function haversineKm(lat1: number, lng1: number, lat2: number, lng2: number): number {
@@ -145,7 +156,36 @@ export default async function handler(req: any, res: any) {
         res.status(400).json({ error: 'bad id' });
         return;
       }
-      await redis.hincrby(REPORTS_KEY, id, 1);
+      // Reporting is moderation power (a few reports hide a place for every
+      // user), so it gets the same identity bar as submitting: a signed-in
+      // account when auth is configured. Each identity counts once per place,
+      // and a daily cap stops mass-hiding runs and unbounded counter growth.
+      let reporter: string;
+      if (AUTH_ENABLED) {
+        const account = await verifyUser(req.headers?.authorization);
+        if (!account) {
+          res.status(401).json({ error: 'Please sign in to report a place' });
+          return;
+        }
+        reporter = `u:${account.uid}`;
+      } else {
+        reporter = `ip:${clientIp(req)}`; // best-effort in anonymous deployments
+      }
+      // Only real places — otherwise report spam could mint unbounded keys.
+      if (!(await redis.hexists(STOPS_KEY, id))) {
+        res.status(404).json({ error: 'unknown place' });
+        return;
+      }
+      const rlKey = `community:rlr:${reporter}`;
+      const rl = await redis.incr(rlKey);
+      if (rl === 1) await redis.expire(rlKey, 86400);
+      if (rl > DAILY_REPORTS) {
+        res.status(429).json({ error: 'Daily report limit reached — try again tomorrow' });
+        return;
+      }
+      // Sets dedup by identity: the counter moves only on a first-time report.
+      const added = await redis.sadd(`community:repby:${id}`, reporter);
+      if (Number(added) === 1) await redis.hincrby(REPORTS_KEY, id, 1);
       res.status(200).json({ ok: true });
       return;
     }
@@ -193,8 +233,7 @@ export default async function handler(req: any, res: any) {
     }
 
     // Rate-limit per account when signed in, else per IP.
-    const ip = String(req.headers?.['x-forwarded-for'] ?? 'unknown').split(',')[0].trim() || 'unknown';
-    const rlKey = `community:rl:${account ? `u:${account.uid}` : ip}`;
+    const rlKey = `community:rl:${account ? `u:${account.uid}` : clientIp(req)}`;
     const n = await redis.incr(rlKey);
     if (n === 1) await redis.expire(rlKey, 86400);
     if (n > DAILY_SUBMISSIONS_PER_IP) {
