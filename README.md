@@ -151,11 +151,38 @@ contains the full disclosure.
    (`yashik1/Side-quest`). Framework preset: **Vite** (auto-detected). Deploy.
 2. Add the `VITE_GEOAPIFY_API_KEY` env var (optional — see above) and redeploy.
 
+## Publishing to the app stores
+
+Pithop is an installable PWA, so both stores are reached by *wrapping* the
+deployed site — no separate native codebase. The manifest ships PNG icons
+(192/512 + maskable), screenshots and the store metadata fields, so
+[PWABuilder](https://www.pwabuilder.com) can package it as-is.
+
+**Google Play (Trusted Web Activity):**
+
+1. Create a Play Console account ($25 one-time), then an app with package
+   name `com.pithop.app`.
+2. On [pwabuilder.com](https://www.pwabuilder.com), enter the production URL
+   and download the Android package (`.aab`).
+3. In Play Console → **Test and release → App integrity → App signing**, copy
+   the **SHA-256 certificate fingerprint** and paste it into
+   `public/.well-known/assetlinks.json` (replacing the placeholder), then
+   redeploy. This is what removes the browser bar from the wrapped app.
+4. Upload the `.aab`, complete the listing (privacy policy:
+   `https://pithop.com/privacy.html`), and submit.
+
+**Apple App Store:** needs the $99/yr developer program and a Mac to build
+the PWABuilder iOS package. Apple may push back on thin web wrappers
+(guideline 4.2); iPhone users can always install via Safari →
+**Add to Home Screen** without the store.
+
 ## Privacy
 
-No accounts, no trackers, no analytics. Trips are stored in the browser's
-local storage only. See `public/privacy.html` (linked in the app footer) for
-the full policy, data-source attribution and affiliate disclosure.
+No ad trackers and no cross-site tracking. Trips are stored in the browser's
+local storage; an account (Google or email) is needed only to share a
+community place; usage stats are cookieless aggregate counts (Vercel Web
+Analytics). See `public/privacy.html` (linked in the app footer) for the full
+policy, data-source attribution and affiliate disclosure.
 
 ## Further production hardening
 

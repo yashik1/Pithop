@@ -1,13 +1,38 @@
 {
+  "id": "/",
   "name": "Pithop — fun stops on long drives",
   "short_name": "Pithop",
-  "description": "Find fun stops, hidden gems and breaks along your driving route.",
+  "description": "Free road-trip planner: enter where you're driving from and to, and Pithop finds scenic viewpoints, quirky attractions, nature, history and food along your route, then guides you there with live navigation.",
   "start_url": "/",
+  "scope": "/",
   "display": "standalone",
-  "background_color": "#ffffff",
+  "orientation": "any",
+  "background_color": "#f2f5fa",
   "theme_color": "#2563eb",
+  "lang": "en",
+  "dir": "ltr",
+  "categories": ["travel", "navigation", "maps"],
   "icons": [
     { "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
-    { "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "maskable" }
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icon-maskable-192.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable" },
+    { "src": "/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "screenshots": [
+    {
+      "src": "/screenshots/plan.png",
+      "sizes": "824x1830",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "Stops found along an Austin to Dallas route"
+    },
+    {
+      "src": "/screenshots/map.png",
+      "sizes": "824x1830",
+      "type": "image/png",
+      "form_factor": "narrow",
+      "label": "Route map with a stop opened"
+    }
   ]
 }
