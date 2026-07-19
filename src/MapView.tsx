@@ -343,9 +343,28 @@ export function MapView({
     }
   }, [live.on, live.pos, live.follow]);
 
+  // Travel-direction needle for the compass — the device's heading, shown only
+  // while driving live (GPS reports it moving; null when stationary/unsupported).
+  const headingDeg =
+    live.on && live.pos && live.pos.heading != null && !Number.isNaN(live.pos.heading)
+      ? live.pos.heading
+      : null;
+
   return (
     <div className="map">
       <div ref={divRef} className="map-canvas" />
+      {/* North-up compass. The map never rotates, so N is always toward the top;
+          during a live drive a blue needle shows the direction of travel. */}
+      <div className="map-compass" aria-hidden="true">
+        <span className="compass-lbl compass-n">N</span>
+        <span className="compass-lbl compass-e">E</span>
+        <span className="compass-lbl compass-s">S</span>
+        <span className="compass-lbl compass-w">W</span>
+        <span className="compass-north" />
+        {headingDeg != null && (
+          <span className="compass-heading" style={{ transform: `rotate(${headingDeg}deg)` }} />
+        )}
+      </div>
       {live.on && (
         <div className="live-hud">
           <div className="live-info">

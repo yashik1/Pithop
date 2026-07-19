@@ -2110,6 +2110,80 @@ body {
   }
 }
 
+/* ---------- Map compass ---------- */
+
+.map-compass {
+  position: absolute;
+  left: 12px;
+  bottom: 22px;
+  z-index: 10;
+  width: 54px;
+  height: 54px;
+  border-radius: 50%;
+  background: rgba(16, 29, 51, 0.82);
+  box-shadow: var(--shadow-2);
+  backdrop-filter: blur(3px);
+  pointer-events: none; /* never intercept map drags/clicks */
+}
+
+.compass-lbl {
+  position: absolute;
+  font-size: 9px;
+  font-weight: 700;
+  line-height: 1;
+  color: rgba(255, 255, 255, 0.6);
+  transform: translate(-50%, -50%);
+}
+
+.compass-n {
+  left: 50%;
+  top: 9px;
+  color: #f87171;
+}
+.compass-s {
+  left: 50%;
+  top: calc(100% - 9px);
+}
+.compass-e {
+  left: calc(100% - 8px);
+  top: 50%;
+}
+.compass-w {
+  left: 8px;
+  top: 50%;
+}
+
+/* Fixed north pointer — the map is north-up, so N is always toward the top. */
+.compass-north {
+  position: absolute;
+  left: 50%;
+  top: 15px;
+  width: 0;
+  height: 0;
+  transform: translateX(-50%);
+  border-left: 5px solid transparent;
+  border-right: 5px solid transparent;
+  border-bottom: 12px solid #f87171;
+}
+
+/* Travel-direction needle, rotates around the compass centre to the heading. */
+.compass-heading {
+  position: absolute;
+  inset: 0;
+  transform-origin: 50% 50%;
+  transition: transform 0.3s var(--ease-out);
+}
+.compass-heading::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 5px;
+  transform: translateX(-50%);
+  border-left: 6px solid transparent;
+  border-right: 6px solid transparent;
+  border-bottom: 15px solid #60a5fa;
+}
+
 .add-place {
   margin: 12px 14px 0;
   padding: 14px 16px;
