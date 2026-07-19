@@ -4,7 +4,7 @@ import type { RouteResult } from './api/route';
 import type { Stop } from './types';
 import { CATEGORY_MAP, thingsToDo } from './lib/categories';
 import { fmtDur } from './lib/format';
-import { geoapifyTileLayer, hasGeoapify } from './api/geoapify';
+import { addTilesWithFailover, tileProviders } from './lib/tiles';
 import { catLabel, t, type Lang } from './lib/i18n';
 
 export interface LivePos {
@@ -173,23 +173,9 @@ export function MapView({
 
   useEffect(() => {
     const map = L.map(divRef.current!, { preferCanvas: true }).setView([39.5, -98.35], 4);
-    // Geoapify tiles (commercial-use OK, needs attribution) when a key is
-    // configured; the donation-funded OSM public tiles otherwise.
-    const tiles = hasGeoapify()
-      ? geoapifyTileLayer()
-      : {
-          url: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-          attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-        };
-    // keepBuffer: hold a wider ring of tiles so pans/zoom-outs reuse them;
-    // updateWhenIdle:false starts fetching while the map is still moving —
-    // both shrink the "blurry tiles" window after a zoom.
-    L.tileLayer(tiles.url, {
-      attribution: tiles.attribution,
-      maxZoom: 19,
-      keepBuffer: 4,
-      updateWhenIdle: false,
-    }).addTo(map);
+    // Tiles with failover: Geoapify when a key is set, else OSM — each backed
+    // by keyless fallbacks so a blocked/down provider never leaves a blank map.
+    addTilesWithFailover(map, tileProviders());
     routeLayerRef.current = L.layerGroup().addTo(map);
     stopsLayerRef.current = L.layerGroup().addTo(map);
     pinLayerRef.current = L.layerGroup().addTo(map);
