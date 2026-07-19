@@ -36,12 +36,14 @@ const OSM_DE: TileProvider = {
 };
 
 // Ordered by preference; each later one is only used if the previous is down.
+// Carto Voyager is the base map for its soft, clean look — no key needed and it
+// spares Geoapify tile credits — with Geoapify (when keyed) and OSM as backups.
 export function tileProviders(): TileProvider[] {
   if (hasGeoapify()) {
     const g = geoapifyTileLayer();
-    return [{ url: g.url, attribution: g.attribution, maxZoom: 20 }, CARTO_VOYAGER, OSM_STD];
+    return [CARTO_VOYAGER, { url: g.url, attribution: g.attribution, maxZoom: 20 }, OSM_STD];
   }
-  return [OSM_STD, CARTO_VOYAGER, OSM_DE];
+  return [CARTO_VOYAGER, OSM_STD, OSM_DE];
 }
 
 // Add the provider at `i`, watching its tiles. If it's broadly failing (several
