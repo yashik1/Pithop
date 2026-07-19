@@ -5,7 +5,13 @@
 // are never cached here — the app persists the trip itself in localStorage.
 const CACHE = 'pithop-v5';
 const EXT_CACHE = 'pithop-ext-v1';
-const EXT_HOSTS = ['tile.openstreetmap.org', 'maps.geoapify.com', 'upload.wikimedia.org'];
+const EXT_HOSTS = [
+  'tile.openstreetmap.org',
+  'tile.openstreetmap.de',
+  'basemaps.cartocdn.com',
+  'maps.geoapify.com',
+  'upload.wikimedia.org',
+];
 const EXT_MAX_ENTRIES = 600;
 
 self.addEventListener('install', () => {
