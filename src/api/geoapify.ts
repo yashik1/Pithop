@@ -11,7 +11,7 @@ import { visitMinutes, type CategoryId } from '../lib/categories';
 import { describeOsm, parkingFromTags, websiteFromTags } from './overpass';
 import { VEHICLE_MAP, type Vehicle } from '../lib/vehicle';
 import type { GeocodeResult } from './geocode';
-import type { RouteResult } from './route';
+import type { RouteOptions, RouteResult } from './route';
 import type { PlacePick } from '../components/PlaceInput';
 
 const KEY = (import.meta.env.VITE_GEOAPIFY_API_KEY as string | undefined) ?? '';
@@ -65,14 +65,7 @@ export async function geoapifyGeocode(query: string): Promise<GeocodeResult> {
   return { lat, lng, displayName: f.properties.formatted ?? query };
 }
 
-export async function geoapifyRoute(from: LatLng, to: LatLng, vehicle: Vehicle = 'car'): Promise<RouteResult> {
-  const mode = VEHICLE_MAP[vehicle]?.geoapify ?? 'drive';
-  const data = await getJson(
-    `${BASE}/v1/routing?waypoints=${from.lat},${from.lng}%7C${to.lat},${to.lng}&mode=${mode}` +
-      `&details=instruction_details&apiKey=${KEY}`,
-  );
-  const f = data.features?.[0];
-  if (!f) throw new Error('No route found between those places for this vehicle');
+function parseGeoapifyRoute(f: GeoFeature): RouteResult {
   // Routing returns a MultiLineString with one line per leg — flatten them.
   const lines: Array<Array<[number, number]>> =
     f.geometry.type === 'MultiLineString' ? f.geometry.coordinates : [f.geometry.coordinates];
@@ -80,11 +73,15 @@ export async function geoapifyRoute(from: LatLng, to: LatLng, vehicle: Vehicle =
   for (const line of lines) for (const [lng, lat] of line) coords.push({ lat, lng });
   if (coords.length < 2) throw new Error('No drivable route found between those places');
   // Turn-by-turn instructions for the live drive HUD. Each step's from_index
-  // points into its own leg's line, giving the maneuver's coordinate.
+  // points into its own leg's line, giving the maneuver's coordinate. Steps
+  // also carry a toll flag where the road data knows one.
   const steps: RouteResult['steps'] = [];
+  let tollSeen = Boolean(f.properties.toll);
   const legs: any[] = f.properties.legs ?? [];
   legs.forEach((leg, i) => {
+    if (leg.toll) tollSeen = true;
     for (const s of leg.steps ?? []) {
+      if (s.toll) tollSeen = true;
       const text = s.instruction?.text;
       const pt = lines[i]?.[s.from_index];
       if (typeof text === 'string' && text && Array.isArray(pt)) {
@@ -97,7 +94,56 @@ export async function geoapifyRoute(from: LatLng, to: LatLng, vehicle: Vehicle =
     distanceKm: (f.properties.distance ?? 0) / 1000,
     durationMin: (f.properties.time ?? 0) / 60,
     steps,
+    tolls: tollSeen ? true : undefined,
   };
+}
+
+// Up to two route options: the balanced route plus the "short" variant when it
+// differs meaningfully. Avoid options map to Geoapify's `avoid` parameter; if
+// the provider rejects them, we retry without and flag it so the UI can say so.
+export async function geoapifyRoutes(
+  from: LatLng,
+  to: LatLng,
+  vehicle: Vehicle = 'car',
+  opts: RouteOptions = {},
+): Promise<RouteResult[]> {
+  const mode = VEHICLE_MAP[vehicle]?.geoapify ?? 'drive';
+  const avoid = [opts.avoidTolls && 'tolls', opts.avoidHighways && 'highways'].filter(Boolean).join('|');
+  const base = (extra: string, withAvoid: boolean) =>
+    `${BASE}/v1/routing?waypoints=${from.lat},${from.lng}%7C${to.lat},${to.lng}&mode=${mode}` +
+    `&details=instruction_details${withAvoid && avoid ? `&avoid=${avoid}` : ''}${extra}&apiKey=${KEY}`;
+
+  let avoidFailed = false;
+  let [main, short] = await Promise.allSettled([
+    getJson(base('', true)),
+    getJson(base('&route_type=short', true)),
+  ]);
+  if (main.status === 'rejected' && avoid) {
+    // Avoid options rejected (or unroutable with them) — fall back to standard.
+    avoidFailed = true;
+    [main, short] = await Promise.allSettled([getJson(base('', false)), getJson(base('&route_type=short', false))]);
+  }
+  if (main.status === 'rejected') {
+    throw main.reason instanceof Error ? main.reason : new Error('No route found between those places');
+  }
+  const f = main.value.features?.[0];
+  if (!f) throw new Error('No route found between those places for this vehicle');
+  const routes: RouteResult[] = [parseGeoapifyRoute(f)];
+  if (avoidFailed) routes[0].avoidFailed = true;
+  if (short.status === 'fulfilled') {
+    const sf = short.value.features?.[0];
+    if (sf) {
+      try {
+        const alt = parseGeoapifyRoute(sf);
+        const dup =
+          Math.abs(alt.distanceKm - routes[0].distanceKm) < 1 && Math.abs(alt.durationMin - routes[0].durationMin) < 2;
+        if (!dup) routes.push(alt);
+      } catch {
+        // unparsable variant — main route is enough
+      }
+    }
+  }
+  return routes;
 }
 
 // Roadside POIs (replaces Overpass). These are Geoapify's documented category

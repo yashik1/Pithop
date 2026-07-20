@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { geocode } from './api/geocode';
-import { fetchRoute, type RouteResult } from './api/route';
+import { fetchRoutes, type RouteResult } from './api/route';
 import { fetchRoadsideStops } from './api/overpass';
 import { fetchWikiExtract, fetchWikiStops } from './api/wikipedia';
 import { fetchGeoapifyRoadside, hasGeoapify } from './api/geoapify';
@@ -183,6 +183,25 @@ export default function App() {
   const [notice, setNotice] = useState<string | null>(null);
   const [route, setRoute] = useState<RouteResult | null>(null);
   const [routeLabel, setRouteLabel] = useState('');
+  // Alternative routes from the last search, and which one is active.
+  const [routeAlts, setRouteAlts] = useState<RouteResult[]>([]);
+  const [routeIdx, setRouteIdx] = useState(0);
+  // Avoid options (Geoapify only — the free server's profile is fixed).
+  const [avoidTolls, setAvoidTolls] = useState(() => {
+    try {
+      return localStorage.getItem('sq-avoid-tolls') === 'on';
+    } catch {
+      return false;
+    }
+  });
+  const [avoidHighways, setAvoidHighways] = useState(() => {
+    try {
+      return localStorage.getItem('sq-avoid-highways') === 'on';
+    } catch {
+      return false;
+    }
+  });
+  const avoidRef = useRef({ tolls: avoidTolls, highways: avoidHighways });
   const [stops, setStops] = useState<Stop[]>([]);
   const [cats, setCats] = useState<Set<CategoryId>>(new Set(CATEGORIES.map((c) => c.id)));
   const [maxDetour, setMaxDetour] = useState(15);
@@ -272,6 +291,8 @@ export default function App() {
     setFromPick(null);
     setToPick(null);
     setRoute(t.route);
+    setRouteAlts([t.route]); // saved trips carry one route — no alternatives UI
+    setRouteIdx(0);
     setRouteLabel(t.routeLabel);
     setStops(t.stops);
     setPlanIds(new Set(t.planIds));
@@ -548,10 +569,34 @@ export default function App() {
       ]);
       if (!fresh()) return;
       setBusy('Calculating route…');
-      const r = await fetchRoute(from, to, veh);
+      const routes = await fetchRoutes(from, to, veh, {
+        avoidTolls: avoidRef.current.tolls,
+        avoidHighways: avoidRef.current.highways,
+      });
+      const r = routes[0];
       if (!fresh()) return;
+      setRouteAlts(routes);
+      setRouteIdx(0);
       setRoute(r);
       setRouteLabel(`${shortName(from.displayName)} → ${shortName(to.displayName)}`);
+      if (r.avoidFailed) {
+        setNotice(`⚠️ ${t('avoidFailed')}`);
+      }
+      await discoverStops(r, token);
+    } catch (e) {
+      if (!fresh()) return;
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      if (fresh()) setBusy(null);
+    }
+  }
+
+  // Find stops along one specific route geometry. Shared by a fresh search and
+  // by switching between route alternatives (which re-scans the new corridor).
+  async function discoverStops(r: RouteResult, token: number) {
+    const fresh = () => searchSeq.current === token;
+    const offKmh = VEHICLE_MAP[vehicleRef.current].offRouteKmh;
+    {
       setBusy('Finding stops along your route…');
 
       // Space the sample discs along the route. Short trips get a much tighter
@@ -630,6 +675,27 @@ export default function App() {
       } else {
         setNotice(wikiError ? 'Wikipedia lookup failed — showing roadside stops only.' : null);
       }
+    }
+  }
+
+  // Switch to another route alternative: same endpoints, new corridor — the
+  // stop list (and any plan) belongs to the old road, so it's rebuilt.
+  async function switchRoute(i: number) {
+    const r = routeAlts[i];
+    if (!r || i === routeIdx || busy) return;
+    const token = ++searchSeq.current;
+    const fresh = () => searchSeq.current === token;
+    setRouteIdx(i);
+    setRoute(r);
+    setStops([]);
+    setPlanIds(new Set());
+    setSelectedId(null);
+    setAheadOnly(false);
+    setMyAlongKm(null);
+    setError(null);
+    setNotice(null);
+    try {
+      await discoverStops(r, token);
     } catch (e) {
       if (!fresh()) return;
       setError(e instanceof Error ? e.message : String(e));
@@ -672,6 +738,20 @@ export default function App() {
     setVehicleState(v);
     setVehicle(v);
     // Re-route immediately if a trip is already on screen.
+    if (route && !busy) void findStops();
+  }
+
+  // Avoid tolls / highways (Geoapify only). Persisted; flips re-route live.
+  function toggleAvoid(kind: 'tolls' | 'highways') {
+    const next = { ...avoidRef.current, [kind]: !avoidRef.current[kind] };
+    avoidRef.current = next;
+    if (kind === 'tolls') setAvoidTolls(next.tolls);
+    else setAvoidHighways(next.highways);
+    try {
+      localStorage.setItem(`sq-avoid-${kind}`, next[kind] ? 'on' : 'off');
+    } catch {
+      // storage blocked — won't persist
+    }
     if (route && !busy) void findStops();
   }
 
@@ -1164,6 +1244,12 @@ export default function App() {
     };
   }, [liveOn, livePos, plan, route, units, toText, routeLabel, liveSteps]);
 
+  // Non-selected route alternatives, drawn dim on the map.
+  const altCoords = useMemo(
+    () => routeAlts.filter((_, i) => i !== routeIdx).map((r) => r.coords),
+    [routeAlts, routeIdx],
+  );
+
   return (
     <div className="app">
       <aside className="sidebar">
@@ -1286,6 +1372,28 @@ export default function App() {
                 );
               })}
             </div>
+            <div className="avoid-row" role="group" aria-label="Route options">
+              <button
+                type="button"
+                className={`avoid-chip${avoidTolls ? ' active' : ''}`}
+                aria-pressed={avoidTolls}
+                disabled={!hasGeoapify()}
+                title={hasGeoapify() ? t('avoidTolls') : t('vehNeedsKey')}
+                onClick={() => toggleAvoid('tolls')}
+              >
+                🚧 {t('avoidTolls')}
+              </button>
+              <button
+                type="button"
+                className={`avoid-chip${avoidHighways ? ' active' : ''}`}
+                aria-pressed={avoidHighways}
+                disabled={!hasGeoapify()}
+                title={hasGeoapify() ? t('avoidHighways') : t('vehNeedsKey')}
+                onClick={() => toggleAvoid('highways')}
+              >
+                🛣️ {t('avoidHighways')}
+              </button>
+            </div>
             <button type="submit" className={`go-btn${busy ? ' busy' : ''}`} disabled={!!busy || !fromText.trim() || !toText.trim()}>
               {busy ?? t('find')}
             </button>
@@ -1402,10 +1510,28 @@ export default function App() {
               </button>
             </div>
             <div className="summary-route">{routeLabel}</div>
+            {routeAlts.length > 1 && (
+              <div className="route-alts" role="group" aria-label={t('routesLabel')}>
+                {routeAlts.map((r, i) => (
+                  <button
+                    key={i}
+                    type="button"
+                    className={`route-alt${i === routeIdx ? ' active' : ''}`}
+                    aria-pressed={i === routeIdx}
+                    title={r.tolls ? t('tollsMaybe') : undefined}
+                    onClick={() => void switchRoute(i)}
+                  >
+                    {fmtDur(r.durationMin)} · {fmtDist(r.distanceKm, units)}
+                    {r.tolls ? ' · 🚧' : ''}
+                  </button>
+                ))}
+              </div>
+            )}
             <div className="summary-stats">
               {fmtDist(route.distanceKm, units)} · {fmtDur(route.durationMin)} {t('drive')} ·{' '}
               {t('stopsFound', { n: stops.length })}
             </div>
+            {route.tolls && <div className="summary-tolls">🚧 {t('tollsMaybe')}</div>}
             {(() => {
               const dest = routeLabel.split('→')[1]?.trim();
               const hotels = dest ? hotelsLink(dest) : null;
@@ -1807,6 +1933,7 @@ export default function App() {
 
       <MapView
         route={route}
+        altRoutes={altCoords}
         stops={filtered}
         planIds={planIds}
         selectedId={selectedId}

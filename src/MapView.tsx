@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import L from 'leaflet';
 import type { RouteResult } from './api/route';
+import type { LatLng as LatLngT } from './lib/geo';
 import type { Stop } from './types';
 import { CATEGORY_MAP, thingsToDo } from './lib/categories';
 import { fmtDur } from './lib/format';
@@ -33,6 +34,8 @@ export interface LiveView {
 
 interface Props {
   route: RouteResult | null;
+  // Non-selected route alternatives, drawn dim behind the active route.
+  altRoutes: LatLngT[][];
   stops: Stop[];
   planIds: Set<string>;
   selectedId: string | null;
@@ -155,6 +158,7 @@ function buildPopup(stop: Stop, live: { current: LiveProps }): HTMLElement {
 
 export function MapView({
   route,
+  altRoutes,
   stops,
   planIds,
   selectedId,
@@ -217,6 +221,15 @@ export function MapView({
     if (!layer || !map) return;
     layer.clearLayers();
     if (!route) return;
+    // Alternatives first (underneath), dim and dashed.
+    for (const alt of altRoutes) {
+      layer.addLayer(
+        L.polyline(
+          alt.map((c) => [c.lat, c.lng] as [number, number]),
+          { color: '#94a3b8', weight: 4, opacity: 0.55, dashArray: '6 8' },
+        ),
+      );
+    }
     const latlngs = route.coords.map((c) => [c.lat, c.lng] as [number, number]);
     const line = L.polyline(latlngs, { color: '#2563eb', weight: 5, opacity: 0.7 });
     layer.addLayer(line);
@@ -227,7 +240,7 @@ export function MapView({
     layer.addLayer(endpoint(latlngs[0], '🚩'));
     layer.addLayer(endpoint(latlngs[latlngs.length - 1], '🏁'));
     map.fitBounds(line.getBounds(), { padding: [40, 40] });
-  }, [route]);
+  }, [route, altRoutes]);
 
   useEffect(() => {
     const layer = stopsLayerRef.current;
