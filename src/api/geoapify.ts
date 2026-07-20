@@ -184,6 +184,12 @@ export async function fetchGeoapifyRoadside(samples: LatLng[]): Promise<Stop[]> 
         // Geoapify surfaces a top-level website; fall back to the raw OSM tags.
         website:
           (props.website ? websiteFromTags({ website: String(props.website) }) : undefined) ?? websiteFromTags(raw),
+        hours:
+          raw.opening_hours != null
+            ? String(raw.opening_hours)
+            : props.opening_hours != null
+              ? String(props.opening_hours)
+              : undefined,
         parking: parkingFromTags(raw),
         offRouteKm: 0,
         alongKm: 0,

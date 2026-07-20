@@ -19,6 +19,7 @@ import { AuthPanel } from './components/AuthPanel';
 import { catLabel, getLang, LANGUAGES, setLang, t, type Lang } from './lib/i18n';
 import { getVehicle, setVehicle, VEHICLES, VEHICLE_MAP, type Vehicle } from './lib/vehicle';
 import { surprisePlan, THEMES, type Theme } from './lib/planner';
+import { hoursStatus, prettyHours } from './lib/hours';
 import {
   clearCurrentTrip,
   deleteSavedTrip,
@@ -1473,6 +1474,7 @@ export default function App() {
                 const added = planIds.has(s.id);
                 const selected = selectedId === s.id;
                 const intro = wikiIntros[s.id];
+                const hs = hoursStatus(s.hours);
                 return (
                   <div
                     key={s.id}
@@ -1499,6 +1501,13 @@ export default function App() {
                         {catLabel(s.category)} · ⏱ {fmtDur(s.visitMin)} · 🚗 {s.detourMin} min · at{' '}
                         {distValue(s.alongKm, units)} {units}
                       </div>
+                      {hs && (
+                        <span className={`hours-badge ${hs.open ? 'open' : 'closed'}`}>
+                          {hs.open ? t('hoursOpen') : t('hoursClosed')}
+                          {hs.open && hs.until ? ` · ${t('hoursUntil', { t: hs.until })}` : ''}
+                          {!hs.open && hs.opensAt ? ` · ${t('hoursOpens', { t: hs.opensAt })}` : ''}
+                        </span>
+                      )}
                       {s.description && <div className="stop-desc">{s.description}</div>}
                       {mealById.has(s.id) && (
                         <div className="stop-meal">
@@ -1510,6 +1519,7 @@ export default function App() {
                           {s.imageUrl && <img className="stop-photo" src={s.imageUrl} alt={s.name} loading="lazy" />}
                           {intro && intro !== s.description && <p className="stop-intro">{intro}</p>}
                           <p className="stop-todo">💡 {thingsToDo(s.kind)}</p>
+                          {s.hours && <p className="stop-hours">🕐 {prettyHours(s.hours)}</p>}
                           {s.parking && (
                             <p className={`stop-parking ${s.parking}`}>🅿️ {t(PARKING_KEY[s.parking])}</p>
                           )}

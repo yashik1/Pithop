@@ -134,6 +134,10 @@ const en = {
   drivePassing: 'Passing {name}',
   tripCard: 'Trip card',
   tripCardSaved: 'Trip card downloaded — share it anywhere.',
+  hoursOpen: 'Open now',
+  hoursClosed: 'Closed',
+  hoursUntil: 'until {t}',
+  hoursOpens: 'opens {t}',
 };
 
 export type TKey = keyof typeof en;

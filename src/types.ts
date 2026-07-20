@@ -14,6 +14,8 @@ export interface Stop {
   wikiUrl?: string;
   // The place's own website (from OSM/Geoapify data), normalized to http(s).
   website?: string;
+  // Raw OSM opening_hours value (e.g. "Mo-Su 07:00-22:00", "24/7").
+  hours?: string;
   // Parking at the spot, when known: free / paid, or 'none' (no on-site parking).
   parking?: 'free' | 'paid' | 'none';
   // Contributor attribution for community stops ("Jane D.").
