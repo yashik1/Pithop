@@ -17,6 +17,8 @@ export interface RouteResult {
   // True when the provider's data flags toll roads on this route; undefined
   // when the provider reports nothing either way (absence is not "toll-free").
   tolls?: boolean;
+  // True when this route was explicitly computed to avoid toll roads.
+  noTolls?: boolean;
   // Set when avoid options were requested but the provider rejected them and
   // the standard route is shown instead.
   avoidFailed?: boolean;
