@@ -151,6 +151,11 @@ const en = {
   bingoBtn: 'Road Trip Bingo',
   bingoHint: 'Tap what you spot along the way — four in a row wins!',
   bingoWin: 'BINGO! Four in a row 🎉',
+  avoidTolls: 'Avoid tolls',
+  avoidHighways: 'Avoid highways',
+  avoidFailed: "Couldn't apply the avoid options — showing the standard route.",
+  routesLabel: 'Route options',
+  tollsMaybe: 'This route may include toll roads',
 };
 
 export type TKey = keyof typeof en;

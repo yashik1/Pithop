@@ -14,6 +14,17 @@ export interface RouteResult {
   distanceKm: number;
   durationMin: number;
   steps?: RouteStep[];
+  // True when the provider's data flags toll roads on this route; undefined
+  // when the provider reports nothing either way (absence is not "toll-free").
+  tolls?: boolean;
+  // Set when avoid options were requested but the provider rejected them and
+  // the standard route is shown instead.
+  avoidFailed?: boolean;
+}
+
+export interface RouteOptions {
+  avoidTolls?: boolean;
+  avoidHighways?: boolean;
 }
 
 // OSRM returns structured maneuvers (type/modifier/road name), not sentences —
@@ -53,20 +64,7 @@ function osrmStepText(step: any): string | null {
   }
 }
 
-export async function fetchRoute(from: LatLng, to: LatLng, vehicle: Vehicle = 'car'): Promise<RouteResult> {
-  const { hasGeoapify, geoapifyRoute } = await import('./geoapify');
-  if (hasGeoapify()) return geoapifyRoute(from, to, vehicle);
-  // The free OSRM demo only serves the car profile; non-car needs Geoapify.
-  const url =
-    `https://router.project-osrm.org/route/v1/driving/` +
-    `${from.lng},${from.lat};${to.lng},${to.lat}?overview=full&geometries=geojson&steps=true`;
-  const res = await fetch(url);
-  if (!res.ok) throw new Error(`Routing failed (HTTP ${res.status})`);
-  const data = await res.json();
-  if (data.code !== 'Ok' || !data.routes?.length) {
-    throw new Error('No drivable route found between those places');
-  }
-  const route = data.routes[0];
+function parseOsrmRoute(route: any): RouteResult {
   const steps: RouteStep[] = [];
   for (const leg of route.legs ?? []) {
     for (const s of leg.steps ?? []) {
@@ -81,4 +79,27 @@ export async function fetchRoute(from: LatLng, to: LatLng, vehicle: Vehicle = 'c
     durationMin: route.duration / 60,
     steps,
   };
+}
+
+// Fetch up to 3 route options, best first. Geoapify (keyed) supports avoid
+// options and route variants; the free OSRM demo serves native alternatives
+// for cars but cannot avoid tolls/highways (fixed profile).
+export async function fetchRoutes(
+  from: LatLng,
+  to: LatLng,
+  vehicle: Vehicle = 'car',
+  opts: RouteOptions = {},
+): Promise<RouteResult[]> {
+  const { hasGeoapify, geoapifyRoutes } = await import('./geoapify');
+  if (hasGeoapify()) return geoapifyRoutes(from, to, vehicle, opts);
+  const url =
+    `https://router.project-osrm.org/route/v1/driving/` +
+    `${from.lng},${from.lat};${to.lng},${to.lat}?overview=full&geometries=geojson&steps=true&alternatives=true`;
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`Routing failed (HTTP ${res.status})`);
+  const data = await res.json();
+  if (data.code !== 'Ok' || !data.routes?.length) {
+    throw new Error('No drivable route found between those places');
+  }
+  return (data.routes as any[]).slice(0, 3).map(parseOsrmRoute);
 }
