@@ -138,6 +138,8 @@ const en = {
   hoursClosed: 'Closed',
   hoursUntil: 'until {t}',
   hoursOpens: 'opens {t}',
+  hoursArriveOpen: 'Open when you arrive (~{t})',
+  hoursArriveClosed: 'Closed when you arrive (~{t})',
 };
 
 export type TKey = keyof typeof en;

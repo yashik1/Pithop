@@ -1474,7 +1474,13 @@ export default function App() {
                 const added = planIds.has(s.id);
                 const selected = selectedId === s.id;
                 const intro = wikiIntros[s.id];
-                const hs = hoursStatus(s.hours);
+                // Hours are judged at the PROJECTED ARRIVAL time, not "now" —
+                // a place 4 hours down the road being open now is irrelevant.
+                const avgKmh =
+                  route && route.durationMin > 0 ? route.distanceKm / (route.durationMin / 60) : 70;
+                const eta = new Date(Date.now() + (s.alongKm / avgKmh) * 3600_000);
+                const etaClock = eta.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                const hs = hoursStatus(s.hours, eta);
                 return (
                   <div
                     key={s.id}
@@ -1503,7 +1509,7 @@ export default function App() {
                       </div>
                       {hs && (
                         <span className={`hours-badge ${hs.open ? 'open' : 'closed'}`}>
-                          {hs.open ? t('hoursOpen') : t('hoursClosed')}
+                          {hs.open ? t('hoursArriveOpen', { t: etaClock }) : `⚠️ ${t('hoursArriveClosed', { t: etaClock })}`}
                           {hs.open && hs.until ? ` · ${t('hoursUntil', { t: hs.until })}` : ''}
                           {!hs.open && hs.opensAt ? ` · ${t('hoursOpens', { t: hs.opensAt })}` : ''}
                         </span>
