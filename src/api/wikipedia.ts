@@ -1,4 +1,4 @@
-import type { LatLng } from '../lib/geo';
+import { haversineKm, type LatLng } from '../lib/geo';
 import type { Stop } from '../types';
 import { visitMinutes, type CategoryId } from '../lib/categories';
 
@@ -215,9 +215,15 @@ export function fetchWikiExtract(pageid: number): Promise<string | null> {
   return cached;
 }
 
-async function fetchNear(p: LatLng): Promise<WikiPage[]> {
+// Two Wikimedia sources share the same geosearch API: Wikipedia (landmarks
+// notable enough for an article) and Wikivoyage (traveller-curated destination
+// pages — parks, scenic areas — whose links open a practical travel guide).
+const WIKI_HOST = 'en.wikipedia.org';
+const VOYAGE_HOST = 'en.wikivoyage.org';
+
+async function fetchNear(host: string, p: LatLng): Promise<WikiPage[]> {
   const url =
-    `https://en.wikipedia.org/w/api.php?action=query&format=json&origin=*` +
+    `https://${host}/w/api.php?action=query&format=json&origin=*` +
     `&generator=geosearch&ggscoord=${p.lat.toFixed(5)}%7C${p.lng.toFixed(5)}&ggsradius=10000&ggslimit=50` +
     `&prop=coordinates%7Cdescription%7Cpageimages%7Cinfo&inprop=url&piprop=thumbnail&pithumbsize=240`;
   const res = await fetch(url);
@@ -226,7 +232,7 @@ async function fetchNear(p: LatLng): Promise<WikiPage[]> {
   return Object.values(data.query?.pages ?? {}) as WikiPage[];
 }
 
-function pagesToStops(pages: Iterable<WikiPage>): Stop[] {
+function pagesToStops(pages: Iterable<WikiPage>, idPrefix: string): Stop[] {
   const stops: Stop[] = [];
   for (const page of pages) {
     const coord = page.coordinates?.[0];
@@ -234,7 +240,7 @@ function pagesToStops(pages: Iterable<WikiPage>): Stop[] {
     const cat = categorizeWiki(page.title, page.description);
     if (!cat) continue;
     stops.push({
-      id: `wiki/${page.pageid}`,
+      id: `${idPrefix}/${page.pageid}`,
       name: page.title,
       lat: coord.lat,
       lng: coord.lon,
@@ -255,18 +261,39 @@ function pagesToStops(pages: Iterable<WikiPage>): Stop[] {
 
 // Long routes need several request rounds; onPartial streams the cumulative
 // results after each round so the first stops render while the rest load.
+// Wikivoyage is queried at every 2nd disc (destination pages are sparse, so
+// coarser coverage loses little and halves the extra request load); its pages
+// run through the same blacklist/rules, and ones that duplicate a Wikipedia
+// landmark nearby are dropped.
 export async function fetchWikiStops(samples: LatLng[], onPartial?: (stops: Stop[]) => void): Promise<Stop[]> {
-  const byId = new Map<number, WikiPage>();
+  const wikiById = new Map<number, WikiPage>();
+  const voyById = new Map<number, WikiPage>();
   const BATCH = 12;
-  for (let i = 0; i < samples.length; i += BATCH) {
-    const results = await Promise.allSettled(samples.slice(i, i + BATCH).map(fetchNear));
-    for (const r of results) {
-      if (r.status === 'fulfilled') {
-        for (const page of r.value) byId.set(page.pageid, page);
-      }
+
+  const assemble = (): Stop[] => {
+    const wiki = pagesToStops(wikiById.values(), 'wiki');
+    const merged = [...wiki];
+    for (const v of pagesToStops(voyById.values(), 'wikiv')) {
+      const vn = v.name.toLowerCase();
+      if (!wiki.some((w) => w.name.toLowerCase() === vn && haversineKm(w, v) < 2)) merged.push(v);
     }
-    if (onPartial && byId.size > 0 && i + BATCH < samples.length) onPartial(pagesToStops(byId.values()));
+    return merged;
+  };
+
+  for (let i = 0; i < samples.length; i += BATCH) {
+    const slice = samples.slice(i, i + BATCH);
+    const [wikiRes, voyRes] = await Promise.all([
+      Promise.allSettled(slice.map((p) => fetchNear(WIKI_HOST, p))),
+      Promise.allSettled(slice.filter((_, j) => (i + j) % 2 === 0).map((p) => fetchNear(VOYAGE_HOST, p))),
+    ]);
+    for (const r of wikiRes) {
+      if (r.status === 'fulfilled') for (const page of r.value) wikiById.set(page.pageid, page);
+    }
+    for (const r of voyRes) {
+      if (r.status === 'fulfilled') for (const page of r.value) voyById.set(page.pageid, page);
+    }
+    if (onPartial && wikiById.size > 0 && i + BATCH < samples.length) onPartial(assemble());
   }
-  if (byId.size === 0) throw new Error('Wikipedia returned no places');
-  return pagesToStops(byId.values());
+  if (wikiById.size === 0 && voyById.size === 0) throw new Error('Wikipedia returned no places');
+  return assemble();
 }

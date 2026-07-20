@@ -5,6 +5,7 @@ import type { Stop } from './types';
 import { CATEGORY_MAP, thingsToDo } from './lib/categories';
 import { fmtDur } from './lib/format';
 import { addTilesWithFailover, tileProviders } from './lib/tiles';
+import { hoursStatus, prettyHours } from './lib/hours';
 import { catLabel, t, type Lang } from './lib/i18n';
 
 export interface LivePos {
@@ -94,6 +95,18 @@ function buildPopup(stop: Stop, live: { current: LiveProps }): HTMLElement {
   if (stop.description) desc.textContent = stop.description;
   else desc.remove();
   div.querySelector('.p-todo')!.textContent = `💡 ${thingsToDo(stop.kind)}`;
+  if (stop.hours) {
+    // Live open/closed status when the OSM hours parse; raw hours otherwise.
+    const hs = hoursStatus(stop.hours);
+    const line = document.createElement('div');
+    line.className = 'p-meta p-hours';
+    line.textContent = hs
+      ? `🕐 ${hs.open ? t('hoursOpen') : t('hoursClosed')}${
+          hs.open && hs.until ? ` · ${t('hoursUntil', { t: hs.until })}` : ''
+        }${!hs.open && hs.opensAt ? ` · ${t('hoursOpens', { t: hs.opensAt })}` : ''}`
+      : `🕐 ${prettyHours(stop.hours)}`;
+    div.querySelector('.p-todo')!.before(line);
+  }
   // Everything URL-shaped from external data (Wikipedia thumbnail/link, OSM
   // website) is validated to http(s) and DOM-assigned — never interpolated
   // into the HTML template above.
@@ -113,7 +126,7 @@ function buildPopup(stop: Stop, live: { current: LiveProps }): HTMLElement {
     a.href = wikiUrl;
     a.target = '_blank';
     a.rel = 'noreferrer';
-    a.textContent = 'Wikipedia ↗';
+    a.textContent = `${wikiUrl.includes('wikivoyage') ? 'Wikivoyage' : 'Wikipedia'} ↗`;
     links.append(' · ', a);
   }
   const siteUrl = httpUrl(stop.website);

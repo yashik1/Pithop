@@ -114,9 +114,8 @@ export function describeOsm(tags: Record<string, string>, kind: string): string 
   if (tags.outdoor_seating === 'yes') features.push('Outdoor seating');
   if (tags.drive_through === 'yes') features.push('Drive-through');
   if (features.length) parts.push(features.join(' · '));
-  if (tags.opening_hours) {
-    parts.push(tags.opening_hours === '24/7' ? 'Open 24/7' : `Open ${tags.opening_hours.slice(0, 40)}`);
-  }
+  // Opening hours are NOT folded in here — they're carried on Stop.hours,
+  // where the UI shows a live open/closed status instead of raw OSM syntax.
   return parts.length ? parts.join(' · ') : undefined;
 }
 
@@ -184,6 +183,7 @@ export async function fetchRoadsideStops(samples: LatLng[]): Promise<Stop[]> {
       source: 'osm',
       description: describeOsm(tags, cat.kind),
       website: websiteFromTags(tags),
+      hours: tags.opening_hours ? String(tags.opening_hours) : undefined,
       parking: parkingFromTags(tags),
       offRouteKm: 0,
       alongKm: 0,
