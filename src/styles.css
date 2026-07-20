@@ -2223,6 +2223,204 @@ body {
   color: #fff;
 }
 
+/* ---------- Fun row: Detour Roulette + Road Trip Bingo ---------- */
+
+.fun-row {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.fun-btn {
+  flex: 1;
+  min-height: 38px;
+  border: 1.5px solid var(--line-strong);
+  border-radius: 10px;
+  background: var(--card);
+  color: var(--ink-2);
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: border-color 0.15s var(--ease-out), color 0.15s var(--ease-out), background 0.15s var(--ease-out),
+    transform 0.12s var(--ease-out);
+}
+
+.fun-btn:hover {
+  border-color: var(--primary);
+  color: var(--primary-deep);
+}
+
+.fun-btn:active {
+  transform: scale(0.97);
+}
+
+.fun-btn.active {
+  border-color: var(--primary-ink);
+  background: var(--primary-ink);
+  color: #fff;
+}
+
+.roulette {
+  margin-top: 10px;
+  padding: 12px 14px;
+  border: 2px dashed #c2419a;
+  border-radius: var(--r-md);
+  background: rgba(194, 65, 154, 0.06);
+  text-align: center;
+}
+
+.roulette-title {
+  font-size: 12.5px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #c2419a;
+}
+
+.roulette-spin {
+  margin-top: 8px;
+  font-size: 26px;
+  animation: roulette-shake 0.22s linear infinite;
+}
+
+@keyframes roulette-shake {
+  0% {
+    transform: translateX(-6px);
+  }
+  50% {
+    transform: translateX(6px);
+  }
+  100% {
+    transform: translateX(-6px);
+  }
+}
+
+.roulette-name {
+  margin-top: 8px;
+  font-size: 16px;
+  font-weight: 800;
+  color: var(--ink);
+  animation: chip-pop 0.35s var(--spring);
+}
+
+.roulette-meta {
+  margin-top: 2px;
+  font-size: 13px;
+  color: var(--ink-2);
+}
+
+.roulette-dare {
+  margin-top: 4px;
+  font-size: 12.5px;
+  font-style: italic;
+  color: #c2419a;
+}
+
+.roulette-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.roulette-add {
+  flex: 1;
+  min-height: 38px;
+  border: none;
+  border-radius: 10px;
+  background: var(--grad-cta);
+  color: #fff;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.roulette-respin {
+  min-height: 38px;
+  padding: 0 14px;
+  border: 1.5px solid var(--line-strong);
+  border-radius: 10px;
+  background: var(--card);
+  color: var(--ink-2);
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.roulette-chicken {
+  margin-top: 8px;
+  font-size: 12px;
+  color: var(--ink-3);
+}
+
+.bingo {
+  margin-top: 10px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  background: var(--card);
+}
+
+.bingo-hint {
+  margin-bottom: 8px;
+  font-size: 12.5px;
+  color: var(--ink-3);
+  text-align: center;
+}
+
+.bingo-win {
+  margin-bottom: 8px;
+  padding: 8px;
+  border-radius: 10px;
+  background: #fef3c7;
+  color: #92400e;
+  font-size: 14px;
+  font-weight: 800;
+  text-align: center;
+  animation: chip-pop 0.4s var(--spring);
+}
+
+:root[data-theme='dark'] .bingo-win {
+  background: #4a3a12;
+  color: #fcd34d;
+}
+
+.bingo-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+}
+
+.bingo-sq {
+  min-height: 64px;
+  padding: 4px;
+  border: 1.5px solid var(--line-strong);
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--ink-2);
+  font-family: inherit;
+  font-size: 10.5px;
+  font-weight: 600;
+  line-height: 1.25;
+  cursor: pointer;
+  overflow: hidden;
+  transition: background 0.15s var(--ease-out), border-color 0.15s var(--ease-out), color 0.15s var(--ease-out);
+}
+
+.bingo-sq.marked {
+  border-color: #16a34a;
+  background: #dcfce7;
+  color: #166534;
+  text-decoration: line-through;
+}
+
+:root[data-theme='dark'] .bingo-sq.marked {
+  background: #14351f;
+  color: #86efac;
+}
+
 /* ---------- Opening-hours badge ---------- */
 
 .hours-badge {

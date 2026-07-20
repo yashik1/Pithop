@@ -18,7 +18,15 @@ import { consumeAuthErrorFromUrl, getUser, hasAuth, signOut, subscribe, type Aut
 import { AuthPanel } from './components/AuthPanel';
 import { catLabel, getLang, LANGUAGES, setLang, t, type Lang } from './lib/i18n';
 import { getVehicle, setVehicle, VEHICLES, VEHICLE_MAP, type Vehicle } from './lib/vehicle';
-import { surprisePlan, THEMES, type Theme } from './lib/planner';
+import {
+  bingoLineCount,
+  buildBingoCard,
+  rouletteSpin,
+  surprisePlan,
+  THEMES,
+  type BingoSquare,
+  type Theme,
+} from './lib/planner';
 import { hoursStatus, prettyHours } from './lib/hours';
 import {
   clearCurrentTrip,
@@ -223,6 +231,15 @@ export default function App() {
   // Surprise-me spare-time budget (minutes) and the active trip vibe.
   const [spareMin, setSpareMin] = useState<number | null>(null);
   const [activeTheme, setActiveTheme] = useState<Theme['id'] | null>(null);
+  // Detour Roulette: the stop on the wheel, spin animation, chicken counter.
+  const [rouletteStop, setRouletteStop] = useState<Stop | null>(null);
+  const [rouletteSpinning, setRouletteSpinning] = useState(false);
+  const [respins, setRespins] = useState(0);
+  // Road Trip Bingo.
+  const [bingoOn, setBingoOn] = useState(false);
+  const [bingoSquares, setBingoSquares] = useState<BingoSquare[]>([]);
+  const [bingoMarked, setBingoMarked] = useState<boolean[]>([]);
+  const [bingoWin, setBingoWin] = useState(false);
   // Landmarks already narrated this drive, and when we last spoke one.
   const factsSpokenRef = useRef<Set<string>>(new Set());
   const lastFactAtRef = useRef(0);
@@ -641,6 +658,9 @@ export default function App() {
     setFromPick(null);
     setToPick(null);
     endLive();
+    setRouletteStop(null);
+    setRespins(0);
+    setBingoOn(false);
     routeCalcRef.current = null;
     activeLibraryIdRef.current = null;
     clearCurrentTrip();
@@ -710,6 +730,79 @@ export default function App() {
     }
     setPlanIds(new Set(ids));
     setNotice(`🎲 ${t('surpriseDone', { n: ids.length })}`);
+  }
+
+  // Detour Roulette: one weighted-random wildcard within the current filters,
+  // revealed after a short spin. Re-spins are counted (and gently mocked).
+  function spinRoulette() {
+    if (rouletteSpinning) return;
+    const candidates = filtered.filter((s) => !planIds.has(s.id));
+    if (!candidates.length) {
+      setNotice(`🎰 ${t('rouletteNone')}`);
+      return;
+    }
+    if (rouletteStop) setRespins((n) => n + 1);
+    setRouletteSpinning(true);
+    const excludeId = rouletteStop?.id;
+    window.setTimeout(() => {
+      setRouletteStop(rouletteSpin(candidates, excludeId));
+      setRouletteSpinning(false);
+    }, 1100);
+  }
+
+  function rouletteCommit() {
+    if (!rouletteStop) return;
+    togglePlan(rouletteStop.id);
+    setSelectedId(rouletteStop.id);
+    setRouletteStop(null);
+    setRespins(0);
+    setNotice(`🎰 ${t('rouletteCommitted')}`);
+  }
+
+  // Road Trip Bingo: 4x4 card of route stops + classic sightings, persisted
+  // per trip so the card (and progress) survives reloads mid-drive.
+  const BINGO_KEY = 'sq-bingo-v1';
+  function openBingo() {
+    if (bingoOn) {
+      setBingoOn(false);
+      return;
+    }
+    try {
+      const saved = JSON.parse(localStorage.getItem(BINGO_KEY) ?? 'null');
+      if (saved && saved.label === routeLabel && Array.isArray(saved.squares) && saved.squares.length === 16) {
+        setBingoSquares(saved.squares);
+        setBingoMarked(Array.isArray(saved.marked) ? saved.marked : Array(16).fill(false));
+        setBingoOn(true);
+        return;
+      }
+    } catch {
+      // corrupt save — deal a fresh card
+    }
+    const squares = buildBingoCard(stops);
+    setBingoSquares(squares);
+    setBingoMarked(Array(16).fill(false));
+    try {
+      localStorage.setItem(BINGO_KEY, JSON.stringify({ label: routeLabel, squares, marked: Array(16).fill(false) }));
+    } catch {
+      // storage blocked — card just won't persist
+    }
+    setBingoOn(true);
+  }
+
+  function toggleBingoSquare(i: number) {
+    const next = [...bingoMarked];
+    next[i] = !next[i];
+    if (bingoLineCount(next) > bingoLineCount(bingoMarked)) {
+      setBingoWin(true);
+      navigator.vibrate?.([80, 40, 80, 40, 160]);
+      window.setTimeout(() => setBingoWin(false), 4000);
+    }
+    setBingoMarked(next);
+    try {
+      localStorage.setItem(BINGO_KEY, JSON.stringify({ label: routeLabel, squares: bingoSquares, marked: next }));
+    } catch {
+      // storage blocked
+    }
   }
 
   // Trip vibes: one-tap category presets. Tapping the active vibe restores all.
@@ -1352,6 +1445,71 @@ export default function App() {
                 <button type="button" className="surprise-go" disabled={!spareMin} onClick={handleSurprise}>
                   🎲 {t('surpriseBtn')}
                 </button>
+              </div>
+            )}
+            {stops.length > 0 && (
+              <div className="fun-row">
+                <button type="button" className="fun-btn" onClick={spinRoulette}>
+                  🎰 {t('rouletteBtn')}
+                </button>
+                <button
+                  type="button"
+                  className={`fun-btn${bingoOn ? ' active' : ''}`}
+                  aria-pressed={bingoOn}
+                  onClick={openBingo}
+                >
+                  🎯 {t('bingoBtn')}
+                </button>
+              </div>
+            )}
+            {(rouletteSpinning || rouletteStop) && (
+              <div className="roulette">
+                <div className="roulette-title">🎰 {t('rouletteTitle')}</div>
+                {rouletteSpinning ? (
+                  <div className="roulette-spin" aria-hidden="true">
+                    🎡 🗿 🦖 🛸 🎪
+                  </div>
+                ) : (
+                  rouletteStop && (
+                    <>
+                      <div className="roulette-name">
+                        {CATEGORY_MAP[rouletteStop.category].emoji} {rouletteStop.name}
+                      </div>
+                      <div className="roulette-meta">
+                        🚗 {rouletteStop.detourMin} min detour · ⏱ {fmtDur(rouletteStop.visitMin)}
+                      </div>
+                      <div className="roulette-dare">{t('rouletteDare')}</div>
+                      <div className="roulette-actions">
+                        <button type="button" className="roulette-add" onClick={rouletteCommit}>
+                          ✅ {t('rouletteAdd')}
+                        </button>
+                        <button type="button" className="roulette-respin" onClick={spinRoulette}>
+                          🔁 {t('rouletteRespin')}
+                        </button>
+                      </div>
+                      {respins >= 2 && <div className="roulette-chicken">{t('rouletteChicken', { n: respins })}</div>}
+                    </>
+                  )
+                )}
+              </div>
+            )}
+            {bingoOn && (
+              <div className="bingo">
+                <div className="bingo-hint">{t('bingoHint')}</div>
+                {bingoWin && <div className="bingo-win">🎉 {t('bingoWin')}</div>}
+                <div className="bingo-grid">
+                  {bingoSquares.map((sq, i) => (
+                    <button
+                      key={i}
+                      type="button"
+                      className={`bingo-sq${bingoMarked[i] ? ' marked' : ''}`}
+                      aria-pressed={bingoMarked[i]}
+                      onClick={() => toggleBingoSquare(i)}
+                    >
+                      {sq.text}
+                    </button>
+                  ))}
+                </div>
               </div>
             )}
             {stops.length > 0 && (

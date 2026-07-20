@@ -45,6 +45,76 @@ export function surprisePlan(stops: Stop[], budgetMin: number): string[] {
   return picked.map((s) => s.id);
 }
 
+// Detour Roulette: one random wildcard pick, weighted toward the quirky stuff
+// (attractions first, scenery next) and places with photos. Never re-deals the
+// stop currently on the wheel when there's any alternative.
+export function rouletteSpin(stops: Stop[], excludeId?: string): Stop | null {
+  const pool = stops.filter((s) => s.id !== excludeId);
+  const candidates = pool.length ? pool : stops;
+  if (!candidates.length) return null;
+  const weight = (s: Stop) =>
+    (s.category === 'fun' ? 4 : s.category === 'views' || s.category === 'nature' ? 2 : 1) +
+    (s.imageUrl ? 2 : 0);
+  const total = candidates.reduce((sum, s) => sum + weight(s), 0);
+  let roll = Math.random() * total;
+  for (const s of candidates) {
+    roll -= weight(s);
+    if (roll <= 0) return s;
+  }
+  return candidates[candidates.length - 1];
+}
+
+// Road Trip Bingo: a 4x4 card mixing real stops from this route with classic
+// road-trip sightings. Squares are shuffled once per trip and persisted so the
+// card survives reloads mid-drive.
+export interface BingoSquare {
+  text: string;
+  stopId?: string;
+}
+
+const SIGHTINGS = [
+  'A water tower',
+  'A red barn',
+  'A dog riding in a truck',
+  'A funny town name',
+  'A license plate from far away',
+  'A field of cows',
+  'Hay bales',
+  'Wind turbines',
+  'A freight train',
+  'A classic car',
+  'A weird roadside statue',
+  'Someone singing in their car',
+  'A rainbow or an epic cloud',
+  'A tractor on the road',
+  'A billboard pun',
+  'Horses',
+];
+
+export function buildBingoCard(stops: Stop[]): BingoSquare[] {
+  const shuffled = <T,>(arr: T[]) => [...arr].sort(() => Math.random() - 0.5);
+  // Up to 6 real stops (short names read best on a small square).
+  const stopSquares: BingoSquare[] = shuffled(stops.filter((s) => s.name.length <= 28))
+    .slice(0, 6)
+    .map((s) => ({ text: s.name, stopId: s.id }));
+  const fillers: BingoSquare[] = shuffled(SIGHTINGS)
+    .slice(0, 16 - stopSquares.length)
+    .map((text) => ({ text }));
+  return shuffled([...stopSquares, ...fillers]);
+}
+
+// All 4-in-a-row lines on a 4x4 card: rows, columns, both diagonals.
+const BINGO_LINES: number[][] = [
+  ...Array.from({ length: 4 }, (_, r) => [0, 1, 2, 3].map((c) => r * 4 + c)),
+  ...Array.from({ length: 4 }, (_, c) => [0, 1, 2, 3].map((r) => r * 4 + c)),
+  [0, 5, 10, 15],
+  [3, 6, 9, 12],
+];
+
+export function bingoLineCount(marked: boolean[]): number {
+  return BINGO_LINES.filter((line) => line.every((i) => marked[i])).length;
+}
+
 // Trip vibes: one-tap presets over the category filter.
 export interface Theme {
   id: 'weird' | 'foodie' | 'nature' | 'history';

@@ -140,6 +140,17 @@ const en = {
   hoursOpens: 'opens {t}',
   hoursArriveOpen: 'Open when you arrive (~{t})',
   hoursArriveClosed: 'Closed when you arrive (~{t})',
+  rouletteBtn: 'Feeling lucky?',
+  rouletteTitle: 'Detour Roulette',
+  rouletteDare: 'Dare you to take this one.',
+  rouletteAdd: "I'm in — add it",
+  rouletteRespin: 'Re-spin',
+  rouletteChicken: 'Re-spins so far: {n} 🐔',
+  rouletteNone: 'No candidates within your detour limit — widen it and spin again.',
+  rouletteCommitted: 'Committed! Enjoy the detour.',
+  bingoBtn: 'Road Trip Bingo',
+  bingoHint: 'Tap what you spot along the way — four in a row wins!',
+  bingoWin: 'BINGO! Four in a row 🎉',
 };
 
 export type TKey = keyof typeof en;
