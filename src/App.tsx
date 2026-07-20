@@ -1518,11 +1518,12 @@ export default function App() {
                     type="button"
                     className={`route-alt${i === routeIdx ? ' active' : ''}`}
                     aria-pressed={i === routeIdx}
-                    title={r.tolls ? t('tollsMaybe') : undefined}
+                    title={r.noTolls ? t('noTollsTitle') : r.tolls ? t('tollsMaybe') : undefined}
                     onClick={() => void switchRoute(i)}
                   >
                     {fmtDur(r.durationMin)} · {fmtDist(r.distanceKm, units)}
                     {r.tolls ? ' · 🚧' : ''}
+                    {r.noTolls ? ` · ✓ ${t('noTollsLabel')}` : ''}
                   </button>
                 ))}
               </div>

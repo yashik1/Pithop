@@ -98,9 +98,11 @@ function parseGeoapifyRoute(f: GeoFeature): RouteResult {
   };
 }
 
-// Up to two route options: the balanced route plus the "short" variant when it
-// differs meaningfully. Avoid options map to Geoapify's `avoid` parameter; if
-// the provider rejects them, we retry without and flag it so the UI can say so.
+// Up to three route options: the balanced route, the "short" variant, and —
+// whenever tolls aren't already being avoided globally — a dedicated TOLL-FREE
+// variant, so the no-tolls choice is always visible without flipping toggles.
+// Duplicates (a variant identical to an earlier route) are dropped. If the
+// provider rejects the user's avoid options, we retry without and flag it.
 export async function geoapifyRoutes(
   from: LatLng,
   to: LatLng,
@@ -108,20 +110,26 @@ export async function geoapifyRoutes(
   opts: RouteOptions = {},
 ): Promise<RouteResult[]> {
   const mode = VEHICLE_MAP[vehicle]?.geoapify ?? 'drive';
-  const avoid = [opts.avoidTolls && 'tolls', opts.avoidHighways && 'highways'].filter(Boolean).join('|');
-  const base = (extra: string, withAvoid: boolean) =>
+  const userAvoid = [opts.avoidTolls && 'tolls', opts.avoidHighways && 'highways'].filter(Boolean).join('|');
+  const url = (extra: string, avoidStr: string) =>
     `${BASE}/v1/routing?waypoints=${from.lat},${from.lng}%7C${to.lat},${to.lng}&mode=${mode}` +
-    `&details=instruction_details${withAvoid && avoid ? `&avoid=${avoid}` : ''}${extra}&apiKey=${KEY}`;
+    `&details=instruction_details${avoidStr ? `&avoid=${avoidStr}` : ''}${extra}&apiKey=${KEY}`;
+  const noTollsAvoid = userAvoid ? (userAvoid.includes('tolls') ? userAvoid : `${userAvoid}|tolls`) : 'tolls';
+
+  const fetchSet = (avoidStr: string) =>
+    Promise.allSettled([
+      getJson(url('', avoidStr)),
+      getJson(url('&route_type=short', avoidStr)),
+      // The toll-free option: skipped only when tolls are avoided anyway.
+      ...(opts.avoidTolls ? [] : [getJson(url('', noTollsAvoid))]),
+    ]);
 
   let avoidFailed = false;
-  let [main, short] = await Promise.allSettled([
-    getJson(base('', true)),
-    getJson(base('&route_type=short', true)),
-  ]);
-  if (main.status === 'rejected' && avoid) {
+  let [main, short, noTolls] = await fetchSet(userAvoid);
+  if (main.status === 'rejected' && userAvoid) {
     // Avoid options rejected (or unroutable with them) — fall back to standard.
     avoidFailed = true;
-    [main, short] = await Promise.allSettled([getJson(base('', false)), getJson(base('&route_type=short', false))]);
+    [main, short, noTolls] = await fetchSet('');
   }
   if (main.status === 'rejected') {
     throw main.reason instanceof Error ? main.reason : new Error('No route found between those places');
@@ -130,16 +138,30 @@ export async function geoapifyRoutes(
   if (!f) throw new Error('No route found between those places for this vehicle');
   const routes: RouteResult[] = [parseGeoapifyRoute(f)];
   if (avoidFailed) routes[0].avoidFailed = true;
-  if (short.status === 'fulfilled') {
+
+  const isDup = (alt: RouteResult) =>
+    routes.some((r) => Math.abs(alt.distanceKm - r.distanceKm) < 1 && Math.abs(alt.durationMin - r.durationMin) < 2);
+  if (short?.status === 'fulfilled') {
     const sf = short.value.features?.[0];
     if (sf) {
       try {
         const alt = parseGeoapifyRoute(sf);
-        const dup =
-          Math.abs(alt.distanceKm - routes[0].distanceKm) < 1 && Math.abs(alt.durationMin - routes[0].durationMin) < 2;
-        if (!dup) routes.push(alt);
+        if (!isDup(alt)) routes.push(alt);
       } catch {
         // unparsable variant — main route is enough
+      }
+    }
+  }
+  if (noTolls?.status === 'fulfilled') {
+    const nf = noTolls.value.features?.[0];
+    if (nf) {
+      try {
+        const alt = parseGeoapifyRoute(nf);
+        alt.noTolls = true;
+        alt.tolls = undefined; // computed with avoid=tolls — don't also flag tolls
+        if (!isDup(alt)) routes.push(alt);
+      } catch {
+        // unparsable variant
       }
     }
   }

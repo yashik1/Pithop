@@ -156,6 +156,8 @@ const en = {
   avoidFailed: "Couldn't apply the avoid options — showing the standard route.",
   routesLabel: 'Route options',
   tollsMaybe: 'This route may include toll roads',
+  noTollsLabel: 'toll-free',
+  noTollsTitle: 'Routed to avoid toll roads',
 };
 
 export type TKey = keyof typeof en;
