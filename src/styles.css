@@ -2110,6 +2110,137 @@ body {
   }
 }
 
+/* ---------- Surprise me (spare-time auto-planner) ---------- */
+
+.surprise {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px dashed var(--line-strong);
+}
+
+.surprise-label {
+  flex-basis: 100%;
+  font-size: 12.5px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+
+.surprise-opts {
+  display: flex;
+  gap: 6px;
+}
+
+.surprise-opts button {
+  min-height: 34px;
+  padding: 0 12px;
+  border: 1.5px solid var(--line-strong);
+  border-radius: 999px;
+  background: var(--card);
+  color: var(--ink-2);
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: border-color 0.15s var(--ease-out), color 0.15s var(--ease-out), background 0.15s var(--ease-out);
+}
+
+.surprise-opts button.active {
+  border-color: var(--primary);
+  background: var(--primary);
+  color: #fff;
+}
+
+.surprise-go {
+  min-height: 34px;
+  padding: 0 14px;
+  border: none;
+  border-radius: 999px;
+  background: var(--grad-cta);
+  color: #fff;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 3px 10px rgba(37, 99, 235, 0.3);
+  transition: filter 0.15s var(--ease-out), transform 0.12s var(--ease-out), opacity 0.15s var(--ease-out);
+}
+
+.surprise-go:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.surprise-go:not(:disabled):hover {
+  filter: brightness(1.08);
+}
+
+.surprise-go:not(:disabled):active {
+  transform: scale(0.96);
+}
+
+/* ---------- Trip vibes ---------- */
+
+.vibes {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
+.vibes-label {
+  font-size: 12.5px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  margin-right: 2px;
+}
+
+.vibe-chip {
+  min-height: 32px;
+  padding: 0 12px;
+  border: 1.5px solid var(--line-strong);
+  border-radius: 999px;
+  background: var(--card);
+  color: var(--ink-2);
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: border-color 0.15s var(--ease-out), color 0.15s var(--ease-out), background 0.15s var(--ease-out);
+}
+
+.vibe-chip.active {
+  border-color: var(--primary-ink);
+  background: var(--primary-ink);
+  color: #fff;
+}
+
+/* ---------- Meal-timing badge ---------- */
+
+.stop-meal {
+  display: inline-block;
+  margin-top: 4px;
+  padding: 2px 9px;
+  border-radius: 999px;
+  background: #fef3c7;
+  color: #92400e;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+:root[data-theme='dark'] .stop-meal {
+  background: #4a3a12;
+  color: #fcd34d;
+}
+
 /* ---------- Map compass ---------- */
 
 .map-compass {

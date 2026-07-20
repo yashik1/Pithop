@@ -18,6 +18,7 @@ import { consumeAuthErrorFromUrl, getUser, hasAuth, signOut, subscribe, type Aut
 import { AuthPanel } from './components/AuthPanel';
 import { catLabel, getLang, LANGUAGES, setLang, t, type Lang } from './lib/i18n';
 import { getVehicle, setVehicle, VEHICLES, VEHICLE_MAP, type Vehicle } from './lib/vehicle';
+import { surprisePlan, THEMES, type Theme } from './lib/planner';
 import {
   clearCurrentTrip,
   deleteSavedTrip,
@@ -218,6 +219,12 @@ export default function App() {
   });
   const voiceRef = useRef(voiceOn);
   voiceRef.current = voiceOn;
+  // Surprise-me spare-time budget (minutes) and the active trip vibe.
+  const [spareMin, setSpareMin] = useState<number | null>(null);
+  const [activeTheme, setActiveTheme] = useState<Theme['id'] | null>(null);
+  // Landmarks already narrated this drive, and when we last spoke one.
+  const factsSpokenRef = useRef<Set<string>>(new Set());
+  const lastFactAtRef = useRef(0);
   // Planned stops we've already announced arrival for this drive (don't repeat).
   const announcedRef = useRef<Set<string>>(new Set());
   // Turn instructions already spoken this drive, keyed by their along-route km
@@ -648,6 +655,7 @@ export default function App() {
   }
 
   function toggleCat(id: CategoryId) {
+    setActiveTheme(null); // manual chip edits leave any one-tap vibe preset
     setCats((prev) => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id);
@@ -689,6 +697,114 @@ export default function App() {
 
   const plan = useMemo(() => stops.filter((s) => planIds.has(s.id)), [stops, planIds]);
   const planExtraMin = plan.reduce((sum, s) => sum + s.visitMin + s.detourMin, 0);
+
+  // "Surprise me": auto-fill the plan with the best stops that fit the spare
+  // time. Works over the filtered list, so an active vibe gives a themed trip.
+  function handleSurprise() {
+    if (!spareMin) return;
+    const ids = surprisePlan(filtered, spareMin);
+    if (ids.length === 0) {
+      setNotice(`🎲 ${t('surpriseNone')}`);
+      return;
+    }
+    setPlanIds(new Set(ids));
+    setNotice(`🎲 ${t('surpriseDone', { n: ids.length })}`);
+  }
+
+  // Trip vibes: one-tap category presets. Tapping the active vibe restores all.
+  function applyTheme(th: Theme) {
+    if (activeTheme === th.id) {
+      setActiveTheme(null);
+      setCats(new Set(CATEGORIES.map((c) => c.id)));
+    } else {
+      setActiveTheme(th.id);
+      setCats(new Set(th.cats));
+    }
+  }
+
+  // Meal timing: project each food stop's arrival clock time from the route's
+  // average speed (leaving now) and badge the ones landing in a meal window.
+  const mealById = useMemo(() => {
+    const out = new Map<string, { clock: string; meal: 'mealLunch' | 'mealDinner' }>();
+    if (!route) return out;
+    const avgKmh = route.durationMin > 0 ? route.distanceKm / (route.durationMin / 60) : 70;
+    const departure = Date.now();
+    for (const s of stops) {
+      if (s.category !== 'food') continue;
+      const eta = new Date(departure + (s.alongKm / avgKmh) * 3600_000);
+      const mins = eta.getHours() * 60 + eta.getMinutes();
+      const meal =
+        mins >= 680 && mins <= 830 ? 'mealLunch' : mins >= 1040 && mins <= 1180 ? 'mealDinner' : null;
+      if (meal) {
+        out.set(s.id, { clock: eta.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }), meal });
+      }
+    }
+    return out;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stops, route]);
+
+  // Shareable trip recap card: a branded 1080x1350 image drawn on a canvas —
+  // route, stats and the stop list — shared via the native sheet when the
+  // browser supports sharing files, else downloaded.
+  async function shareTripCard() {
+    if (!route || plan.length === 0) return;
+    const W = 1080;
+    const H = 1350;
+    const c = document.createElement('canvas');
+    c.width = W;
+    c.height = H;
+    const x = c.getContext('2d');
+    if (!x) return;
+    const g = x.createLinearGradient(0, 0, W, H);
+    g.addColorStop(0, '#1e3a8a');
+    g.addColorStop(0.5, '#2563eb');
+    g.addColorStop(1, '#0891b2');
+    x.fillStyle = g;
+    x.fillRect(0, 0, W, H);
+    x.fillStyle = '#bfdbfe';
+    x.font = '700 40px system-ui, sans-serif';
+    x.fillText('🛣️ My Pithop road trip', 64, 108);
+    x.fillStyle = '#ffffff';
+    x.font = '800 62px system-ui, sans-serif';
+    let label = routeLabel;
+    while (label.length > 8 && x.measureText(label).width > W - 128) label = `${label.slice(0, -2)}…`;
+    x.fillText(label, 64, 200);
+    x.fillStyle = '#bfdbfe';
+    x.font = '600 38px system-ui, sans-serif';
+    x.fillText(
+      `${fmtDist(route.distanceKm, units)} · ${fmtDur(route.durationMin + planExtraMin)} · ${plan.length} stops`,
+      64,
+      264,
+    );
+    x.fillStyle = '#ffffff';
+    x.font = '500 40px system-ui, sans-serif';
+    const shown = plan.slice(0, 10);
+    shown.forEach((s, i) => {
+      const name = s.name.length > 32 ? `${s.name.slice(0, 31)}…` : s.name;
+      x.fillText(`${CATEGORY_MAP[s.category].emoji}  ${name}`, 64, 370 + i * 84);
+    });
+    if (plan.length > shown.length) {
+      x.fillStyle = '#bfdbfe';
+      x.fillText(`… and ${plan.length - shown.length} more`, 64, 370 + shown.length * 84);
+    }
+    x.fillStyle = '#ffffff';
+    x.font = '700 42px system-ui, sans-serif';
+    x.fillText('pithop.com', 64, H - 64);
+    const blob = await new Promise<Blob | null>((res) => c.toBlob(res, 'image/png'));
+    if (!blob) return;
+    const file = new File([blob], 'pithop-trip.png', { type: 'image/png' });
+    if (navigator.canShare?.({ files: [file] })) {
+      await navigator.share({ files: [file], title: 'My Pithop road trip' }).catch(() => {});
+      return;
+    }
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'pithop-trip.png';
+    a.click();
+    URL.revokeObjectURL(url);
+    setNotice(`📸 ${t('tripCardSaved')}`);
+  }
 
   // When a Wikipedia stop is opened, pull in the article intro so the card
   // can say more than the one-line short description.
@@ -749,6 +865,8 @@ export default function App() {
     announcedRef.current = new Set();
     spokenFarRef.current = new Set();
     spokenNearRef.current = new Set();
+    factsSpokenRef.current = new Set();
+    lastFactAtRef.current = 0;
     arrivedRef.current = false;
     setLivePos(null);
     setLiveFollow(true);
@@ -883,6 +1001,27 @@ export default function App() {
       setNotice(`🏁 ${t('liveArrived')}`);
       navigator.vibrate?.([120, 60, 120, 60, 240]);
       speak(t('liveArrived'));
+    }
+    // Drive facts: narrate a landmark you're about to pass (voice on, not in
+    // the plan — planned stops get their own arrival call). One per landmark
+    // per drive, throttled so the car isn't chattering.
+    if (voiceRef.current && Date.now() - lastFactAtRef.current > 45_000) {
+      const fact = stops.find(
+        (s) =>
+          s.source === 'wiki' &&
+          s.description &&
+          !planIds.has(s.id) &&
+          !factsSpokenRef.current.has(s.id) &&
+          s.offRouteKm < 5 &&
+          s.alongKm - proj.alongKm > 0 &&
+          s.alongKm - proj.alongKm < 1.2,
+      );
+      if (fact) {
+        factsSpokenRef.current.add(fact.id);
+        lastFactAtRef.current = Date.now();
+        speak(`${t('drivePassing', { name: fact.name })}. ${fact.description}`);
+        setNotice(`🔎 ${t('drivePassing', { name: fact.name })} — ${fact.description}`);
+      }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [livePos, liveOn]);
@@ -1194,6 +1333,27 @@ export default function App() {
               </button>
             )}
             {stops.length > 0 && (
+              <div className="surprise">
+                <span className="surprise-label">{t('spareTime')}</span>
+                <div className="surprise-opts" role="group" aria-label={t('spareTime')}>
+                  {[60, 120, 240, 480].map((m) => (
+                    <button
+                      key={m}
+                      type="button"
+                      className={spareMin === m ? 'active' : ''}
+                      aria-pressed={spareMin === m}
+                      onClick={() => setSpareMin((cur) => (cur === m ? null : m))}
+                    >
+                      {m === 480 ? t('fullDay') : fmtDur(m)}
+                    </button>
+                  ))}
+                </div>
+                <button type="button" className="surprise-go" disabled={!spareMin} onClick={handleSurprise}>
+                  🎲 {t('surpriseBtn')}
+                </button>
+              </div>
+            )}
+            {stops.length > 0 && (
               <label className="ahead">
                 <input type="checkbox" checked={aheadOnly} onChange={toggleAhead} />
                 {t('aheadLabel')} ({units === 'mi' ? '50 mi' : '80 km'})
@@ -1208,6 +1368,20 @@ export default function App() {
         {stops.length > 0 && (
           <>
             <div className="filters">
+              <div className="vibes" role="group" aria-label={t('vibeLabel')}>
+                <span className="vibes-label">{t('vibeLabel')}</span>
+                {THEMES.map((th) => (
+                  <button
+                    key={th.id}
+                    type="button"
+                    className={`vibe-chip${activeTheme === th.id ? ' active' : ''}`}
+                    aria-pressed={activeTheme === th.id}
+                    onClick={() => applyTheme(th)}
+                  >
+                    {th.emoji} {t(`theme_${th.id}` as 'theme_weird')}
+                  </button>
+                ))}
+              </div>
               <div className="chips">
                 {CATEGORIES.map((c) => {
                   const active = cats.has(c.id);
@@ -1277,6 +1451,14 @@ export default function App() {
                   <button type="button" className="plan-share" onClick={() => void shareTrip()}>
                     🔗 {t('share')}
                   </button>
+                  <button
+                    type="button"
+                    className="plan-share"
+                    title={t('tripCard')}
+                    onClick={() => void shareTripCard()}
+                  >
+                    📸 {t('tripCard')}
+                  </button>
                 </div>
               </div>
             )}
@@ -1318,6 +1500,11 @@ export default function App() {
                         {distValue(s.alongKm, units)} {units}
                       </div>
                       {s.description && <div className="stop-desc">{s.description}</div>}
+                      {mealById.has(s.id) && (
+                        <div className="stop-meal">
+                          🍽 ~{mealById.get(s.id)!.clock} · {t(mealById.get(s.id)!.meal)}
+                        </div>
+                      )}
                       {selected && (
                         <div className="stop-details">
                           {s.imageUrl && <img className="stop-photo" src={s.imageUrl} alt={s.name} loading="lazy" />}

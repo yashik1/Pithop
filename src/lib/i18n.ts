@@ -119,6 +119,21 @@ const en = {
   liveInMile: 'In one mile',
   liveInKm: 'In one kilometer',
   liveArrived: 'You have arrived at your destination',
+  spareTime: 'Spare time for stops:',
+  fullDay: 'Full day',
+  surpriseBtn: 'Surprise me',
+  surpriseDone: 'Planned {n} great stops that fit your spare time — tap again to shuffle, or tweak below!',
+  surpriseNone: "Couldn't fit any stops in that time — try a bigger budget or a wider detour.",
+  vibeLabel: 'Trip vibe:',
+  theme_weird: 'Roadside Weird',
+  theme_foodie: 'Foodie run',
+  theme_nature: 'Nature escape',
+  theme_history: 'History buff',
+  mealLunch: 'perfect for lunch',
+  mealDinner: 'perfect for dinner',
+  drivePassing: 'Passing {name}',
+  tripCard: 'Trip card',
+  tripCardSaved: 'Trip card downloaded — share it anywhere.',
 };
 
 export type TKey = keyof typeof en;
