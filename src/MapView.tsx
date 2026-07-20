@@ -113,7 +113,7 @@ function buildPopup(stop: Stop, live: { current: LiveProps }): HTMLElement {
     a.href = wikiUrl;
     a.target = '_blank';
     a.rel = 'noreferrer';
-    a.textContent = 'Wikipedia ↗';
+    a.textContent = `${wikiUrl.includes('wikivoyage') ? 'Wikivoyage' : 'Wikipedia'} ↗`;
     links.append(' · ', a);
   }
   const siteUrl = httpUrl(stop.website);

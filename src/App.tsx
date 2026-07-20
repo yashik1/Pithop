@@ -1534,7 +1534,7 @@ export default function App() {
                             )}
                             {s.wikiUrl && (
                               <a href={s.wikiUrl} target="_blank" rel="noreferrer">
-                                Wikipedia ↗
+                                {s.wikiUrl.includes('wikivoyage') ? 'Wikivoyage' : 'Wikipedia'} ↗
                               </a>
                             )}
                             <a
