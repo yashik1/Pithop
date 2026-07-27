@@ -221,10 +221,13 @@ export function fetchWikiExtract(pageid: number): Promise<string | null> {
 const WIKI_HOST = 'en.wikipedia.org';
 const VOYAGE_HOST = 'en.wikivoyage.org';
 
+// Radius and limit are both sized to the app's search corridor rather than to
+// the bare minimum: geosearch bills per request, not per result, so a bigger
+// disc and a higher cap surface far more landmarks for the same request count.
 async function fetchNear(host: string, p: LatLng): Promise<WikiPage[]> {
   const url =
     `https://${host}/w/api.php?action=query&format=json&origin=*` +
-    `&generator=geosearch&ggscoord=${p.lat.toFixed(5)}%7C${p.lng.toFixed(5)}&ggsradius=10000&ggslimit=50` +
+    `&generator=geosearch&ggscoord=${p.lat.toFixed(5)}%7C${p.lng.toFixed(5)}&ggsradius=10000&ggslimit=100` +
     `&prop=coordinates%7Cdescription%7Cpageimages%7Cinfo&inprop=url&piprop=thumbnail&pithumbsize=240`;
   const res = await fetch(url);
   if (!res.ok) throw new Error(`Wikipedia lookup failed (HTTP ${res.status})`);

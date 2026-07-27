@@ -35,6 +35,11 @@ const en = {
   tagline: 'Fun stops, hidden gems and breaks along your drive',
   fromPh: 'From — city, address',
   toPh: 'To — city or address',
+  viaPh: 'Stop along the way — city or address',
+  addVia: 'Add a stop',
+  viaRemove: 'Remove this stop',
+  viaUp: 'Move this stop earlier',
+  viaDown: 'Move this stop later',
   find: 'Find stops along the way',
   drive: 'drive',
   stopsFound: '{n} stops found',
@@ -168,6 +173,8 @@ const dicts: Partial<Record<Lang, Partial<Record<TKey, string>>>> = {
   es: {
     tagline: 'Paradas divertidas, joyas ocultas y descansos en tu ruta',
     fromPh: 'Desde — ciudad, dirección', toPh: 'Hasta — ciudad o dirección',
+    viaPh: 'Parada en el camino — ciudad o dirección', addVia: 'Añadir una parada', viaRemove: 'Quitar esta parada',
+    viaUp: 'Mover antes', viaDown: 'Mover después',
     find: 'Buscar paradas en el camino', drive: 'de viaje', stopsFound: '{n} paradas encontradas',
     aheadLabel: 'En ruta: solo paradas por delante de mí', maxDetour: 'Desvío máximo', timeToSpend: 'Tiempo disponible',
     visitQuick: 'Parada rápida (≤ 15 min)', visitShort: 'Corta (≤ 30 min)', visit1h: 'Hasta 1 hora', visit2h: 'Hasta 2 horas', visitAny: 'Cualquier duración',
@@ -184,6 +191,8 @@ const dicts: Partial<Record<Lang, Partial<Record<TKey, string>>>> = {
   fr: {
     tagline: 'Des arrêts sympas, des pépites et des pauses sur votre route',
     fromPh: 'Départ — ville, adresse', toPh: 'Arrivée — ville ou adresse',
+    viaPh: 'Étape en route — ville ou adresse', addVia: 'Ajouter une étape', viaRemove: 'Supprimer cette étape',
+    viaUp: 'Déplacer plus tôt', viaDown: 'Déplacer plus tard',
     find: 'Trouver des arrêts en chemin', drive: 'de route', stopsFound: '{n} arrêts trouvés',
     aheadLabel: 'En route : seulement les arrêts devant moi', maxDetour: 'Détour max', timeToSpend: 'Temps disponible',
     visitQuick: 'Arrêt rapide (≤ 15 min)', visitShort: 'Court (≤ 30 min)', visit1h: "Jusqu'à 1 heure", visit2h: "Jusqu'à 2 heures", visitAny: 'Toute durée',
@@ -200,6 +209,8 @@ const dicts: Partial<Record<Lang, Partial<Record<TKey, string>>>> = {
   de: {
     tagline: 'Coole Stopps, Geheimtipps und Pausen auf deiner Fahrt',
     fromPh: 'Von — Stadt, Adresse', toPh: 'Nach — Stadt oder Adresse',
+    viaPh: 'Zwischenstopp — Stadt oder Adresse', addVia: 'Stopp hinzufügen', viaRemove: 'Diesen Stopp entfernen',
+    viaUp: 'Nach vorne verschieben', viaDown: 'Nach hinten verschieben',
     find: 'Stopps auf dem Weg finden', drive: 'Fahrt', stopsFound: '{n} Stopps gefunden',
     aheadLabel: 'Unterwegs: nur Stopps vor mir', maxDetour: 'Max. Umweg', timeToSpend: 'Verfügbare Zeit',
     visitQuick: 'Kurzstopp (≤ 15 Min)', visitShort: 'Kurz (≤ 30 Min)', visit1h: 'Bis zu 1 Stunde', visit2h: 'Bis zu 2 Stunden', visitAny: 'Beliebig lang',
@@ -216,6 +227,8 @@ const dicts: Partial<Record<Lang, Partial<Record<TKey, string>>>> = {
   pt: {
     tagline: 'Paradas divertidas, joias escondidas e pausas na sua viagem',
     fromPh: 'De — cidade, endereço', toPh: 'Para — cidade ou endereço',
+    viaPh: 'Parada no caminho — cidade ou endereço', addVia: 'Adicionar parada', viaRemove: 'Remover esta parada',
+    viaUp: 'Mover para antes', viaDown: 'Mover para depois',
     find: 'Encontrar paradas no caminho', drive: 'de viagem', stopsFound: '{n} paradas encontradas',
     aheadLabel: 'Na estrada: só paradas à minha frente', maxDetour: 'Desvio máx.', timeToSpend: 'Tempo disponível',
     visitQuick: 'Parada rápida (≤ 15 min)', visitShort: 'Curta (≤ 30 min)', visit1h: 'Até 1 hora', visit2h: 'Até 2 horas', visitAny: 'Qualquer duração',
@@ -232,6 +245,8 @@ const dicts: Partial<Record<Lang, Partial<Record<TKey, string>>>> = {
   it: {
     tagline: 'Soste divertenti, gemme nascoste e pause lungo il viaggio',
     fromPh: 'Da — città, indirizzo', toPh: 'A — città o indirizzo',
+    viaPh: 'Tappa lungo il percorso — città o indirizzo', addVia: 'Aggiungi una tappa', viaRemove: 'Rimuovi questa tappa',
+    viaUp: 'Sposta prima', viaDown: 'Sposta dopo',
     find: 'Trova soste lungo il percorso', drive: 'di viaggio', stopsFound: '{n} soste trovate',
     aheadLabel: 'In viaggio: solo soste davanti a me', maxDetour: 'Deviazione max', timeToSpend: 'Tempo disponibile',
     visitQuick: 'Sosta rapida (≤ 15 min)', visitShort: 'Breve (≤ 30 min)', visit1h: 'Fino a 1 ora', visit2h: 'Fino a 2 ore', visitAny: 'Qualsiasi durata',
@@ -248,6 +263,8 @@ const dicts: Partial<Record<Lang, Partial<Record<TKey, string>>>> = {
   nl: {
     tagline: 'Leuke stops, verborgen pareltjes en pauzes onderweg',
     fromPh: 'Van — stad, adres', toPh: 'Naar — stad of adres',
+    viaPh: 'Tussenstop — stad of adres', addVia: 'Stop toevoegen', viaRemove: 'Deze stop verwijderen',
+    viaUp: 'Eerder plaatsen', viaDown: 'Later plaatsen',
     find: 'Vind stops onderweg', drive: 'rijden', stopsFound: '{n} stops gevonden',
     aheadLabel: 'Onderweg: alleen stops voor me', maxDetour: 'Max. omweg', timeToSpend: 'Beschikbare tijd',
     visitQuick: 'Korte stop (≤ 15 min)', visitShort: 'Kort (≤ 30 min)', visit1h: 'Tot 1 uur', visit2h: 'Tot 2 uur', visitAny: 'Elke duur',
@@ -264,6 +281,8 @@ const dicts: Partial<Record<Lang, Partial<Record<TKey, string>>>> = {
   ru: {
     tagline: 'Интересные остановки, скрытые жемчужины и паузы в пути',
     fromPh: 'Откуда — город, адрес', toPh: 'Куда — город или адрес',
+    viaPh: 'Остановка по пути — город или адрес', addVia: 'Добавить остановку', viaRemove: 'Удалить эту остановку',
+    viaUp: 'Переместить раньше', viaDown: 'Переместить позже',
     find: 'Найти остановки по пути', drive: 'в пути', stopsFound: 'найдено остановок: {n}',
     aheadLabel: 'В дороге: только остановки впереди', maxDetour: 'Макс. крюк', timeToSpend: 'Сколько времени есть',
     visitQuick: 'Быстрая (≤ 15 мин)', visitShort: 'Короткая (≤ 30 мин)', visit1h: 'До 1 часа', visit2h: 'До 2 часов', visitAny: 'Любая',
@@ -280,6 +299,8 @@ const dicts: Partial<Record<Lang, Partial<Record<TKey, string>>>> = {
   uk: {
     tagline: 'Цікаві зупинки, приховані перлини та паузи в дорозі',
     fromPh: 'Звідки — місто, адреса', toPh: 'Куди — місто чи адреса',
+    viaPh: 'Зупинка в дорозі — місто чи адреса', addVia: 'Додати зупинку', viaRemove: 'Вилучити цю зупинку',
+    viaUp: 'Перемістити раніше', viaDown: 'Перемістити пізніше',
     find: 'Знайти зупинки по дорозі', drive: 'у дорозі', stopsFound: 'знайдено зупинок: {n}',
     aheadLabel: 'У дорозі: лише зупинки попереду', maxDetour: 'Макс. гак', timeToSpend: 'Скільки є часу',
     visitQuick: 'Швидка (≤ 15 хв)', visitShort: 'Коротка (≤ 30 хв)', visit1h: 'До 1 години', visit2h: 'До 2 годин', visitAny: 'Будь-яка',
@@ -296,6 +317,8 @@ const dicts: Partial<Record<Lang, Partial<Record<TKey, string>>>> = {
   pl: {
     tagline: 'Ciekawe przystanki, ukryte perełki i przerwy w podróży',
     fromPh: 'Skąd — miasto, adres', toPh: 'Dokąd — miasto lub adres',
+    viaPh: 'Przystanek w drodze — miasto lub adres', addVia: 'Dodaj przystanek', viaRemove: 'Usuń ten przystanek',
+    viaUp: 'Przenieś wcześniej', viaDown: 'Przenieś później',
     find: 'Znajdź przystanki po drodze', drive: 'jazdy', stopsFound: 'znaleziono przystanków: {n}',
     aheadLabel: 'W trasie: tylko przystanki przede mną', maxDetour: 'Maks. objazd', timeToSpend: 'Dostępny czas',
     visitQuick: 'Szybki (≤ 15 min)', visitShort: 'Krótki (≤ 30 min)', visit1h: 'Do 1 godziny', visit2h: 'Do 2 godzin', visitAny: 'Dowolny',
@@ -312,6 +335,8 @@ const dicts: Partial<Record<Lang, Partial<Record<TKey, string>>>> = {
   tr: {
     tagline: 'Yol boyunca eğlenceli duraklar, gizli cevherler ve molalar',
     fromPh: 'Nereden — şehir, adres', toPh: 'Nereye — şehir veya adres',
+    viaPh: 'Yol üstü durak — şehir veya adres', addVia: 'Durak ekle', viaRemove: 'Bu durağı kaldır',
+    viaUp: 'Öne al', viaDown: 'Sonraya al',
     find: 'Yol üstü durakları bul', drive: 'sürüş', stopsFound: '{n} durak bulundu',
     aheadLabel: 'Yolda: yalnızca önümdeki duraklar', maxDetour: 'En fazla sapma', timeToSpend: 'Ayrılacak süre',
     visitQuick: 'Hızlı durak (≤ 15 dk)', visitShort: 'Kısa (≤ 30 dk)', visit1h: '1 saate kadar', visit2h: '2 saate kadar', visitAny: 'Herhangi bir süre',
@@ -328,6 +353,8 @@ const dicts: Partial<Record<Lang, Partial<Record<TKey, string>>>> = {
   ar: {
     tagline: 'محطات ممتعة وكنوز خفية واستراحات على طول رحلتك',
     fromPh: 'من — مدينة أو عنوان', toPh: 'إلى — مدينة أو عنوان',
+    viaPh: 'محطة في الطريق — مدينة أو عنوان', addVia: 'إضافة محطة', viaRemove: 'إزالة هذه المحطة',
+    viaUp: 'تحريك إلى الأمام', viaDown: 'تحريك إلى الخلف',
     find: 'ابحث عن محطات في الطريق', drive: 'قيادة', stopsFound: 'تم العثور على {n} محطة',
     aheadLabel: 'على الطريق: المحطات أمامي فقط', maxDetour: 'أقصى انعطاف', timeToSpend: 'الوقت المتاح',
     visitQuick: 'وقفة سريعة (≤ ١٥ دقيقة)', visitShort: 'قصيرة (≤ ٣٠ دقيقة)', visit1h: 'حتى ساعة', visit2h: 'حتى ساعتين', visitAny: 'أي مدة',
@@ -344,6 +371,8 @@ const dicts: Partial<Record<Lang, Partial<Record<TKey, string>>>> = {
   hi: {
     tagline: 'रास्ते भर मज़ेदार पड़ाव, छुपे रत्न और ब्रेक',
     fromPh: 'कहाँ से — शहर, पता', toPh: 'कहाँ तक — शहर या पता',
+    viaPh: 'रास्ते में रुकना — शहर या पता', addVia: 'एक पड़ाव जोड़ें', viaRemove: 'यह पड़ाव हटाएँ',
+    viaUp: 'पहले ले जाएँ', viaDown: 'बाद में ले जाएँ',
     find: 'रास्ते में पड़ाव खोजें', drive: 'ड्राइव', stopsFound: '{n} पड़ाव मिले',
     aheadLabel: 'सफ़र में: सिर्फ़ आगे के पड़ाव', maxDetour: 'अधिकतम मोड़', timeToSpend: 'बिताने का समय',
     visitQuick: 'झटपट (≤ 15 मिनट)', visitShort: 'छोटा (≤ 30 मिनट)', visit1h: '1 घंटे तक', visit2h: '2 घंटे तक', visitAny: 'कोई भी अवधि',
@@ -360,6 +389,8 @@ const dicts: Partial<Record<Lang, Partial<Record<TKey, string>>>> = {
   id: {
     tagline: 'Perhentian seru, permata tersembunyi, dan istirahat di perjalanan',
     fromPh: 'Dari — kota, alamat', toPh: 'Ke — kota atau alamat',
+    viaPh: 'Perhentian di jalan — kota atau alamat', addVia: 'Tambah perhentian', viaRemove: 'Hapus perhentian ini',
+    viaUp: 'Pindah lebih awal', viaDown: 'Pindah lebih akhir',
     find: 'Cari perhentian di jalan', drive: 'berkendara', stopsFound: '{n} perhentian ditemukan',
     aheadLabel: 'Di jalan: hanya perhentian di depan', maxDetour: 'Belok maks.', timeToSpend: 'Waktu tersedia',
     visitQuick: 'Cepat (≤ 15 mnt)', visitShort: 'Singkat (≤ 30 mnt)', visit1h: 'Hingga 1 jam', visit2h: 'Hingga 2 jam', visitAny: 'Berapa pun',
@@ -376,6 +407,8 @@ const dicts: Partial<Record<Lang, Partial<Record<TKey, string>>>> = {
   vi: {
     tagline: 'Điểm dừng thú vị, viên ngọc ẩn và những lần nghỉ trên đường',
     fromPh: 'Từ — thành phố, địa chỉ', toPh: 'Đến — thành phố hoặc địa chỉ',
+    viaPh: 'Điểm dừng trên đường — thành phố hoặc địa chỉ', addVia: 'Thêm điểm dừng', viaRemove: 'Xóa điểm dừng này',
+    viaUp: 'Chuyển lên trước', viaDown: 'Chuyển xuống sau',
     find: 'Tìm điểm dừng trên đường', drive: 'lái xe', stopsFound: 'Tìm thấy {n} điểm dừng',
     aheadLabel: 'Trên đường: chỉ điểm dừng phía trước', maxDetour: 'Vòng tối đa', timeToSpend: 'Thời gian có',
     visitQuick: 'Nhanh (≤ 15 phút)', visitShort: 'Ngắn (≤ 30 phút)', visit1h: 'Đến 1 giờ', visit2h: 'Đến 2 giờ', visitAny: 'Bất kỳ',
@@ -392,6 +425,8 @@ const dicts: Partial<Record<Lang, Partial<Record<TKey, string>>>> = {
   zh: {
     tagline: '旅途中的有趣停靠、隐藏景点与休息点',
     fromPh: '出发地 — 城市、地址', toPh: '目的地 — 城市或地址',
+    viaPh: '途经点 — 城市或地址', addVia: '添加途经点', viaRemove: '移除此途经点',
+    viaUp: '上移', viaDown: '下移',
     find: '查找沿途停靠点', drive: '车程', stopsFound: '找到 {n} 个停靠点',
     aheadLabel: '在路上：只看前方的停靠点', maxDetour: '最大绕行', timeToSpend: '可用时间',
     visitQuick: '快速停靠（≤ 15 分钟）', visitShort: '短暂（≤ 30 分钟）', visit1h: '最多 1 小时', visit2h: '最多 2 小时', visitAny: '任意时长',
@@ -408,6 +443,8 @@ const dicts: Partial<Record<Lang, Partial<Record<TKey, string>>>> = {
   ja: {
     tagline: 'ドライブ途中の楽しい立ち寄り・隠れた名所・休憩',
     fromPh: '出発地 — 都市・住所', toPh: '目的地 — 都市または住所',
+    viaPh: '経由地 — 都市または住所', addVia: '経由地を追加', viaRemove: 'この経由地を削除',
+    viaUp: '前に移動', viaDown: '後に移動',
     find: '途中の立ち寄りを探す', drive: '運転', stopsFound: '{n} 件の立ち寄りが見つかりました',
     aheadLabel: '走行中：前方の立ち寄りのみ', maxDetour: '最大寄り道', timeToSpend: '使える時間',
     visitQuick: 'さっと（15分以内）', visitShort: '短め（30分以内）', visit1h: '1時間まで', visit2h: '2時間まで', visitAny: '指定なし',
@@ -424,6 +461,8 @@ const dicts: Partial<Record<Lang, Partial<Record<TKey, string>>>> = {
   ko: {
     tagline: '드라이브 중 즐거운 정차, 숨은 명소, 휴식',
     fromPh: '출발 — 도시, 주소', toPh: '도착 — 도시 또는 주소',
+    viaPh: '경유지 — 도시 또는 주소', addVia: '경유지 추가', viaRemove: '이 경유지 삭제',
+    viaUp: '앞으로 이동', viaDown: '뒤로 이동',
     find: '경로 위 정차지 찾기', drive: '주행', stopsFound: '{n}개의 정차지를 찾음',
     aheadLabel: '주행 중: 앞쪽 정차지만', maxDetour: '최대 우회', timeToSpend: '가능한 시간',
     visitQuick: '빠르게 (≤ 15분)', visitShort: '짧게 (≤ 30분)', visit1h: '1시간까지', visit2h: '2시간까지', visitAny: '제한 없음',

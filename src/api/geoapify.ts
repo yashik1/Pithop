@@ -104,15 +104,17 @@ function parseGeoapifyRoute(f: GeoFeature): RouteResult {
 // Duplicates (a variant identical to an earlier route) are dropped. If the
 // provider rejects the user's avoid options, we retry without and flag it.
 export async function geoapifyRoutes(
-  from: LatLng,
-  to: LatLng,
+  points: LatLng[],
   vehicle: Vehicle = 'car',
   opts: RouteOptions = {},
 ): Promise<RouteResult[]> {
   const mode = VEHICLE_MAP[vehicle]?.geoapify ?? 'drive';
   const userAvoid = [opts.avoidTolls && 'tolls', opts.avoidHighways && 'highways'].filter(Boolean).join('|');
+  // Geoapify takes the whole ordered waypoint list in one request, so a trip
+  // with intermediate stops comes back as one route with one leg per hop.
+  const waypoints = points.map((p) => `${p.lat},${p.lng}`).join('%7C');
   const url = (extra: string, avoidStr: string) =>
-    `${BASE}/v1/routing?waypoints=${from.lat},${from.lng}%7C${to.lat},${to.lng}&mode=${mode}` +
+    `${BASE}/v1/routing?waypoints=${waypoints}&mode=${mode}` +
     `&details=instruction_details${avoidStr ? `&avoid=${avoidStr}` : ''}${extra}&apiKey=${KEY}`;
   const noTollsAvoid = userAvoid ? (userAvoid.includes('tolls') ? userAvoid : `${userAvoid}|tolls`) : 'tolls';
 
@@ -132,10 +134,21 @@ export async function geoapifyRoutes(
     [main, short, noTolls] = await fetchSet('');
   }
   if (main.status === 'rejected') {
-    throw main.reason instanceof Error ? main.reason : new Error('No route found between those places');
+    if (main.reason instanceof Error) throw main.reason;
+    throw new Error(
+      points.length > 2
+        ? 'No route found through all of your stops — try moving or removing one'
+        : 'No route found between those places',
+    );
   }
   const f = main.value.features?.[0];
-  if (!f) throw new Error('No route found between those places for this vehicle');
+  if (!f) {
+    throw new Error(
+      points.length > 2
+        ? 'No route found through all of your stops for this vehicle'
+        : 'No route found between those places for this vehicle',
+    );
+  }
   const routes: RouteResult[] = [parseGeoapifyRoute(f)];
   if (avoidFailed) routes[0].avoidFailed = true;
 
@@ -173,10 +186,17 @@ export async function geoapifyRoutes(
 // high-confidence categories. The request is tried category-by-category
 // (Promise.allSettled), so if one slug is ever rejected the others still
 // return, and coverage degrades gracefully instead of failing wholesale.
-// Kept to slugs we're confident are valid — one invalid slug 400s the whole
-// request. If even this is rejected, the fetch falls back to bare 'catering'.
-const ROADSIDE_CATEGORIES = 'catering.restaurant,catering.cafe,catering.fast_food,catering.ice_cream,service.vehicle.fuel,tourism.attraction';
-const ROADSIDE_FALLBACK = 'catering';
+// One invalid slug 400s the whole request, so the category list is tried in
+// tiers, widest first: the full set, then the long-proven core, then bare
+// 'catering'. That lets the wider set (EV charging, sights, parks, nature)
+// be attempted without risking total loss of coverage if a slug is retired.
+const ROADSIDE_TIERS = [
+  'catering.restaurant,catering.cafe,catering.fast_food,catering.ice_cream,' +
+    'service.vehicle.fuel,service.vehicle.charging_station,' +
+    'tourism.attraction,tourism.sights,leisure.park,natural',
+  'catering.restaurant,catering.cafe,catering.fast_food,catering.ice_cream,service.vehicle.fuel,tourism.attraction',
+  'catering',
+];
 
 function categorizeGeoapify(cats: string[]): { category: CategoryId; kind: string } | null {
   const has = (c: string) => cats.some((x) => x === c || x.startsWith(c + '.'));
@@ -187,29 +207,44 @@ function categorizeGeoapify(cats: string[]): { category: CategoryId; kind: strin
   if (has('catering.ice_cream')) return { category: 'food', kind: 'ice_cream' };
   if (has('catering.cafe')) return { category: 'food', kind: 'cafe' };
   if (has('catering')) return { category: 'food', kind: 'restaurant' };
+  // Water and protected land read as nature; the rest of `natural` (peaks,
+  // caves, dunes) is scenic, so it lands under viewpoints.
+  if (has('natural.water') || has('natural.forest') || has('leisure.park.nature_reserve')) {
+    return { category: 'nature', kind: 'nature_reserve' };
+  }
+  if (has('leisure.park')) return { category: 'nature', kind: 'park' };
+  if (has('natural')) return { category: 'views', kind: 'viewpoint' };
+  if (has('tourism.sights')) return { category: 'history', kind: 'historic_site' };
   if (has('tourism')) return { category: 'fun', kind: 'attraction' };
   return null;
 }
 
 export async function fetchGeoapifyRoadside(samples: LatLng[]): Promise<Stop[]> {
   // Every 2nd sample with a wider radius halves the credit cost per search.
+  // The radius covers the whole search corridor, and the per-circle `limit` is
+  // well above what one disc usually holds — both cost nothing extra, since
+  // the request count (which is what Geoapify bills) is unchanged.
   const circles = samples.filter((_, i) => i % 2 === 0);
-  const radiusM = 13000;
+  const radiusM = 16000;
 
   const fetchCircle = (p: LatLng, categories: string) =>
     getJson(
       `${BASE}/v2/places?categories=${categories}` +
-        `&filter=circle:${p.lng.toFixed(4)},${p.lat.toFixed(4)},${radiusM}&limit=100&apiKey=${KEY}`,
+        `&filter=circle:${p.lng.toFixed(4)},${p.lat.toFixed(4)},${radiusM}&limit=200&apiKey=${KEY}`,
     );
 
-  // Probe the first circle; if the category list is rejected (e.g. a slug is
-  // no longer valid), fall back to bare 'catering' before fanning out so at
-  // least food still appears.
-  let categories = ROADSIDE_CATEGORIES;
-  try {
-    await fetchCircle(circles[0], categories);
-  } catch {
-    categories = ROADSIDE_FALLBACK;
+  // Probe the first circle to settle on a category list before fanning out:
+  // walk the tiers widest-first and keep the first one the API accepts, so a
+  // retired slug costs variety rather than all coverage.
+  let categories = ROADSIDE_TIERS[ROADSIDE_TIERS.length - 1];
+  for (const tier of ROADSIDE_TIERS) {
+    try {
+      await fetchCircle(circles[0], tier);
+      categories = tier;
+      break;
+    } catch {
+      // try the next, narrower tier
+    }
   }
 
   const results = await Promise.allSettled(circles.map((p) => fetchCircle(p, categories)));

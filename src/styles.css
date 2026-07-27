@@ -367,6 +367,83 @@ body {
   min-width: 0;
 }
 
+/* ---------- Intermediate stops (route waypoints) ---------- */
+
+.via-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.via-row .place-input {
+  flex: 1;
+  min-width: 0;
+}
+
+.via-num {
+  flex: none;
+  width: 22px;
+  height: 22px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.9);
+  color: var(--primary-deep);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.via-actions {
+  flex: none;
+  display: flex;
+  gap: 3px;
+}
+
+.via-btn {
+  width: 28px;
+  min-height: 34px;
+  border: none;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.16);
+  color: #fff;
+  font-family: inherit;
+  font-size: 11px;
+  line-height: 1;
+  cursor: pointer;
+  transition: background 0.15s var(--ease-out), opacity 0.15s var(--ease-out);
+}
+
+.via-btn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+.via-btn:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.via-btn.remove {
+  font-size: 13px;
+}
+
+.add-via-btn {
+  align-self: flex-start;
+  border: 1px dashed rgba(255, 255, 255, 0.5);
+  border-radius: 10px;
+  background: none;
+  color: #fff;
+  padding: 7px 12px;
+  font-family: inherit;
+  font-size: 12.5px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.15s var(--ease-out);
+}
+
+.add-via-btn:hover {
+  background: rgba(255, 255, 255, 0.16);
+}
+
 .place-input {
   position: relative;
 }
@@ -1405,6 +1482,26 @@ body {
   border: none;
   text-shadow: none;
   filter: drop-shadow(0 2px 2px rgba(0, 0, 0, 0.35));
+}
+
+/* Numbered pin for one of the traveller's own intermediate stops. */
+.via-pin {
+  background: none;
+  border: none;
+}
+
+.via-pin span {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--primary-deep, #1d4ed8);
+  color: #fff;
+  border: 2px solid #fff;
+  font-size: 11px;
+  font-weight: 800;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.35);
 }
 
 .leaflet-popup-content-wrapper {
