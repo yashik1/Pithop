@@ -10,6 +10,11 @@ import type { Stop } from '../types';
 export interface TripData {
   fromText: string;
   toText: string;
+  // Intermediate stops the route passes through: the search-form text, plus the
+  // coordinates they resolved to. Both optional — trips saved before multi-stop
+  // routes existed have neither, and must keep loading.
+  viaTexts?: string[];
+  routeVias?: Array<{ lat: number; lng: number }>;
   routeLabel: string;
   route: RouteResult;
   stops: Stop[];

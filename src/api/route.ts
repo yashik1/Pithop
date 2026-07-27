@@ -86,22 +86,33 @@ function parseOsrmRoute(route: any): RouteResult {
 // Fetch up to 3 route options, best first. Geoapify (keyed) supports avoid
 // options and route variants; the free OSRM demo serves native alternatives
 // for cars but cannot avoid tolls/highways (fixed profile).
+//
+// `points` is the ordered waypoint list — [origin, …vias, destination] — so a
+// trip with intermediate stops is one route through them all, not several
+// separate routes. Alternatives are only requested for a plain A→B trip:
+// with vias the corridor is already pinned down by the user's own stops, and
+// OSRM returns a single route for multi-waypoint requests anyway.
 export async function fetchRoutes(
-  from: LatLng,
-  to: LatLng,
+  points: LatLng[],
   vehicle: Vehicle = 'car',
   opts: RouteOptions = {},
 ): Promise<RouteResult[]> {
+  if (points.length < 2) throw new Error('A route needs a start and an end');
   const { hasGeoapify, geoapifyRoutes } = await import('./geoapify');
-  if (hasGeoapify()) return geoapifyRoutes(from, to, vehicle, opts);
+  if (hasGeoapify()) return geoapifyRoutes(points, vehicle, opts);
+  const path = points.map((p) => `${p.lng},${p.lat}`).join(';');
   const url =
-    `https://router.project-osrm.org/route/v1/driving/` +
-    `${from.lng},${from.lat};${to.lng},${to.lat}?overview=full&geometries=geojson&steps=true&alternatives=true`;
+    `https://router.project-osrm.org/route/v1/driving/${path}` +
+    `?overview=full&geometries=geojson&steps=true&alternatives=${points.length === 2}`;
   const res = await fetch(url);
   if (!res.ok) throw new Error(`Routing failed (HTTP ${res.status})`);
   const data = await res.json();
   if (data.code !== 'Ok' || !data.routes?.length) {
-    throw new Error('No drivable route found between those places');
+    throw new Error(
+      points.length > 2
+        ? 'No drivable route found through all of your stops — try moving or removing one'
+        : 'No drivable route found between those places',
+    );
   }
   return (data.routes as any[]).slice(0, 3).map(parseOsrmRoute);
 }

@@ -36,6 +36,8 @@ interface Props {
   route: RouteResult | null;
   // Non-selected route alternatives, drawn dim behind the active route.
   altRoutes: LatLngT[][];
+  // The traveller's own intermediate stops, drawn as numbered pins.
+  routeVias: LatLngT[];
   stops: Stop[];
   planIds: Set<string>;
   selectedId: string | null;
@@ -159,6 +161,7 @@ function buildPopup(stop: Stop, live: { current: LiveProps }): HTMLElement {
 export function MapView({
   route,
   altRoutes,
+  routeVias,
   stops,
   planIds,
   selectedId,
@@ -239,8 +242,23 @@ export function MapView({
       });
     layer.addLayer(endpoint(latlngs[0], '🚩'));
     layer.addLayer(endpoint(latlngs[latlngs.length - 1], '🏁'));
+    // Numbered pins for the traveller's own intermediate stops, so the order
+    // the route follows is visible at a glance.
+    routeVias.forEach((v, i) => {
+      layer.addLayer(
+        L.marker([v.lat, v.lng], {
+          icon: L.divIcon({
+            className: 'via-pin',
+            html: `<span>${i + 1}</span>`,
+            iconSize: [24, 24],
+            iconAnchor: [12, 22],
+          }),
+          title: `${t('addVia')} ${i + 1}`,
+        }),
+      );
+    });
     map.fitBounds(line.getBounds(), { padding: [40, 40] });
-  }, [route, altRoutes]);
+  }, [route, altRoutes, routeVias]);
 
   useEffect(() => {
     const layer = stopsLayerRef.current;

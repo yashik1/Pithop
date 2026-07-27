@@ -54,8 +54,9 @@ const PARKING_KEY: Record<'free' | 'paid' | 'none', 'parkFree' | 'parkPaid' | 'p
 };
 
 // Decode a shared trip from location.hash (#trip=<base64>). Returns the route
-// endpoints (as text) and the planned stops, or null if there's no valid share.
-function parseShareHash(): { fromText: string; toText: string; plan: Stop[] } | null {
+// endpoints and any intermediate stops (as text) plus the planned stops, or
+// null if there's no valid share. `w` (waypoints) is absent in older links.
+function parseShareHash(): { fromText: string; toText: string; viaTexts: string[]; plan: Stop[] } | null {
   const m = /[#&]trip=([^&]+)/.exec(location.hash);
   if (!m) return null;
   try {
@@ -79,7 +80,10 @@ function parseShareHash(): { fromText: string; toText: string; plan: Stop[] } | 
       alongKm: 0,
       detourMin: 0,
     }));
-    return { fromText: String(data.f), toText: String(data.t), plan };
+    const viaTexts: string[] = Array.isArray(data.w)
+      ? data.w.map((v: unknown) => String(v ?? '').slice(0, 200)).filter((v: string) => v.trim()).slice(0, MAX_VIAS)
+      : [];
+    return { fromText: String(data.f), toText: String(data.t), viaTexts, plan };
   } catch {
     return null;
   }
@@ -90,7 +94,7 @@ import { getUnits, setUnits } from './lib/units';
 import { MapView, type LivePos } from './MapView';
 import { PlaceInput } from './components/PlaceInput';
 
-const DETOUR_OPTIONS = [5, 10, 15, 25, 40];
+const DETOUR_OPTIONS = [5, 10, 15, 25, 40, 60];
 const VISIT_OPTIONS: Array<{ key: 'visitQuick' | 'visitShort' | 'visit1h' | 'visit2h' | 'visitAny'; max: number }> = [
   { key: 'visitQuick', max: 15 },
   { key: 'visitShort', max: 30 },
@@ -98,7 +102,34 @@ const VISIT_OPTIONS: Array<{ key: 'visitQuick' | 'visitShort' | 'visit1h' | 'vis
   { key: 'visit2h', max: 120 },
   { key: 'visitAny', max: 9999 },
 ];
-const LIST_CAP = 250;
+const LIST_CAP = 400;
+// How far off the road a place can sit and still count as "along the way".
+// Every source is queried out to roughly this far, so this is the width of the
+// corridor the traveller can actually explore via the max-detour filter.
+const CORRIDOR_KM = 15;
+// Default max round-trip detour. At a car's 40 km/h off-route estimate this
+// reaches ~7.5 km either side — generous enough that a first search shows the
+// interesting finds a few minutes off the highway, not just the roadside ones.
+const DEFAULT_MAX_DETOUR = 25;
+
+// How many intermediate stops a route may carry. Both routers handle far more,
+// but each one adds a leg to geocode and draw, and the search form has to stay
+// usable on a phone.
+const MAX_VIAS = 8;
+
+// One intermediate waypoint in the search form. `pick` holds exact coordinates
+// when the traveller chose an autocomplete suggestion; free-typed text is
+// geocoded at search time instead.
+interface Via {
+  key: string;
+  text: string;
+  pick: LatLng | null;
+}
+
+let viaSeq = 0;
+function newVia(text = ''): Via {
+  return { key: `via-${++viaSeq}`, text, pick: null };
+}
 
 function shortName(displayName: string): string {
   return displayName.split(',')[0];
@@ -178,6 +209,12 @@ export default function App() {
   // button); when set, the search skips geocoding the typed text.
   const [fromPick, setFromPick] = useState<LatLng | null>(null);
   const [toPick, setToPick] = useState<LatLng | null>(null);
+  // Intermediate stops the traveller wants the route to pass through, in order.
+  const [vias, setVias] = useState<Via[]>([]);
+  // Resolved coordinates of the vias on the active route — kept separately from
+  // the form so the map and the Google Maps handoff use what was actually
+  // routed, not text the traveller may have edited since.
+  const [routeVias, setRouteVias] = useState<LatLng[]>([]);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -204,7 +241,7 @@ export default function App() {
   const avoidRef = useRef({ tolls: avoidTolls, highways: avoidHighways });
   const [stops, setStops] = useState<Stop[]>([]);
   const [cats, setCats] = useState<Set<CategoryId>>(new Set(CATEGORIES.map((c) => c.id)));
-  const [maxDetour, setMaxDetour] = useState(15);
+  const [maxDetour, setMaxDetour] = useState(DEFAULT_MAX_DETOUR);
   const [maxVisit, setMaxVisit] = useState(9999);
   const [planIds, setPlanIds] = useState<Set<string>>(new Set());
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -290,6 +327,8 @@ export default function App() {
     setToText(t.toText);
     setFromPick(null);
     setToPick(null);
+    setVias((t.viaTexts ?? []).map((v) => newVia(v)));
+    setRouteVias(t.routeVias ?? []);
     setRoute(t.route);
     setRouteAlts([t.route]); // saved trips carry one route — no alternatives UI
     setRouteIdx(0);
@@ -307,6 +346,8 @@ export default function App() {
       ? {
           fromText,
           toText,
+          viaTexts: vias.map((v) => v.text).filter((v) => v.trim()),
+          routeVias,
           routeLabel,
           route: { ...route, coords: simplify(route.coords, 1500) },
           stops,
@@ -344,8 +385,9 @@ export default function App() {
       setToText(shared.toText);
       setFromPick(null);
       setToPick(null);
+      setVias(shared.viaTexts.map((v) => newVia(v)));
       setNotice('Opening a shared trip — finding stops along the route…');
-      void findStops(shared.fromText, shared.toText);
+      void findStops(shared.fromText, shared.toText, shared.viaTexts);
       return;
     }
     const saved = loadCurrentTrip();
@@ -417,6 +459,13 @@ export default function App() {
     setSavedTrips(deleteSavedTrip(t.id));
   }
 
+  // How far along the active route a coordinate sits, for ordering things by
+  // road position. 0 when there's no route to measure against.
+  function alongKmOf(p: LatLng): number {
+    const calc = routeCalcRef.current;
+    return calc ? projectOntoRoute(p, calc.calcRoute, calc.cum).alongKm : 0;
+  }
+
   // Enrich a single stop against the active route (no-op when no route).
   function enrichWithRoute(s: Stop): Stop {
     const calc = routeCalcRef.current;
@@ -485,16 +534,23 @@ export default function App() {
   // multi-stop driving route in Google Maps. Google's consumer URL takes up
   // to ~9 waypoints; extra stops are dropped from navigation (still in the plan).
   function navigateTrip() {
-    if (!route || plan.length === 0) return;
+    if (!route || (plan.length === 0 && routeVias.length === 0)) return;
     const origin = route.coords[0];
     const dest = route.coords[route.coords.length - 1];
-    const waypoints = plan.slice(0, 9).map((s) => `${s.lat},${s.lng}`);
+    // The traveller's own intermediate stops define the route, so they go in
+    // alongside the planned stops, interleaved in road order — otherwise Google
+    // would re-route around them and the drive wouldn't match what's on screen.
+    const all = [
+      ...routeVias.map((v) => ({ lat: v.lat, lng: v.lng, alongKm: alongKmOf(v) })),
+      ...plan.map((s) => ({ lat: s.lat, lng: s.lng, alongKm: s.alongKm })),
+    ].sort((a, b) => a.alongKm - b.alongKm);
+    const waypoints = all.slice(0, 9).map((s) => `${s.lat},${s.lng}`);
     const url =
       `https://www.google.com/maps/dir/?api=1&travelmode=driving` +
       `&origin=${origin.lat},${origin.lng}&destination=${dest.lat},${dest.lng}` +
       `&waypoints=${encodeURIComponent(waypoints.join('|'))}`;
     window.open(url, '_blank', 'noopener');
-    if (plan.length > 9) {
+    if (all.length > 9) {
       setNotice('Opened your first 9 stops in Google Maps — Google limits a shared route to 9 waypoints.');
     }
   }
@@ -506,6 +562,7 @@ export default function App() {
     const payload = {
       f: fromText,
       t: toText,
+      w: vias.map((v) => v.text).filter((v) => v.trim()),
       p: plan.map((s) => ({
         n: s.name,
         a: Number(s.lat.toFixed(5)),
@@ -544,11 +601,17 @@ export default function App() {
 
   // Overrides let callers (e.g. opening a shared link) pass endpoints directly
   // instead of relying on React state that hasn't flushed yet.
-  async function findStops(overrideFrom?: string, overrideTo?: string) {
+  async function findStops(overrideFrom?: string, overrideTo?: string, overrideVias?: string[]) {
     const fText = overrideFrom ?? fromText;
     const tText = overrideTo ?? toText;
     const fPick = overrideFrom ? null : fromPick;
     const tPick = overrideTo ? null : toPick;
+    // Overridden vias arrive as plain text (from a share link) and need
+    // geocoding; the form's own vias may already carry exact coordinates.
+    const viaList: Array<{ text: string; pick: LatLng | null }> = overrideVias
+      ? overrideVias.map((text) => ({ text, pick: null }))
+      : vias.map((v) => ({ text: v.text, pick: v.pick }));
+    const activeVias = viaList.filter((v) => v.text.trim());
     const token = ++searchSeq.current;
     const fresh = () => searchSeq.current === token;
     activeLibraryIdRef.current = null; // a fresh search is a new, unsaved trip
@@ -563,13 +626,17 @@ export default function App() {
     const veh = vehicleRef.current;
     const offKmh = VEHICLE_MAP[veh].offRouteKmh;
     try {
-      const [from, to] = await Promise.all([
+      const [from, to, ...viaPlaces] = await Promise.all([
         fPick ? Promise.resolve({ ...fPick, displayName: fText }) : geocode(fText),
         tPick ? Promise.resolve({ ...tPick, displayName: tText }) : geocode(tText),
+        ...activeVias.map((v) =>
+          v.pick ? Promise.resolve({ ...v.pick, displayName: v.text }) : geocode(v.text),
+        ),
       ]);
       if (!fresh()) return;
-      setBusy('Calculating route…');
-      const routes = await fetchRoutes(from, to, veh, {
+      setBusy(activeVias.length ? 'Calculating route through your stops…' : 'Calculating route…');
+      const points = [from, ...viaPlaces, to].map((p) => ({ lat: p.lat, lng: p.lng }));
+      const routes = await fetchRoutes(points, veh, {
         avoidTolls: avoidRef.current.tolls,
         avoidHighways: avoidRef.current.highways,
       });
@@ -578,7 +645,8 @@ export default function App() {
       setRouteAlts(routes);
       setRouteIdx(0);
       setRoute(r);
-      setRouteLabel(`${shortName(from.displayName)} → ${shortName(to.displayName)}`);
+      setRouteVias(points.slice(1, -1));
+      setRouteLabel([from, ...viaPlaces, to].map((p) => shortName(p.displayName)).join(' → '));
       if (r.avoidFailed) {
         setNotice(`⚠️ ${t('avoidFailed')}`);
       }
@@ -624,7 +692,7 @@ export default function App() {
               detourMin: Math.round((proj.offRouteKm * 2 * 60) / offKmh) + 2,
             };
           })
-          .filter((s) => s.offRouteKm <= 12)
+          .filter((s) => s.offRouteKm <= CORRIDOR_KM)
           .sort((a, b) => a.alongKm - b.alongKm);
 
       // Roadside data (food, fuel, rest areas) comes from Geoapify when a key
@@ -723,6 +791,8 @@ export default function App() {
     setToText('');
     setFromPick(null);
     setToPick(null);
+    setVias([]);
+    setRouteVias([]);
     endLive();
     setRouletteStop(null);
     setRespins(0);
@@ -753,6 +823,34 @@ export default function App() {
       // storage blocked — won't persist
     }
     if (route && !busy) void findStops();
+  }
+
+  // --- Intermediate stops (route waypoints) -------------------------------
+  // Edits only touch the form; nothing re-routes until the traveller searches
+  // again, so a half-typed stop never wipes the trip already on screen.
+  function addVia() {
+    setVias((prev) => (prev.length >= MAX_VIAS ? prev : [...prev, newVia()]));
+  }
+
+  function removeVia(key: string) {
+    setVias((prev) => prev.filter((v) => v.key !== key));
+  }
+
+  function updateVia(key: string, patch: Partial<Omit<Via, 'key'>>) {
+    setVias((prev) => prev.map((v) => (v.key === key ? { ...v, ...patch } : v)));
+  }
+
+  // Order is what the router follows, so travellers need to fix a stop entered
+  // out of sequence without retyping it.
+  function moveVia(key: string, dir: -1 | 1) {
+    setVias((prev) => {
+      const i = prev.findIndex((v) => v.key === key);
+      const j = i + dir;
+      if (i < 0 || j < 0 || j >= prev.length) return prev;
+      const next = [...prev];
+      [next[i], next[j]] = [next[j], next[i]];
+      return next;
+    });
   }
 
   function toggleCat(id: CategoryId) {
@@ -1341,6 +1439,55 @@ export default function App() {
                 {locating ? '⏳' : '📍'}
               </button>
             </div>
+            {vias.map((v, i) => (
+              <div className="via-row" key={v.key}>
+                <span className="via-num" aria-hidden="true">
+                  {i + 1}
+                </span>
+                <PlaceInput
+                  value={v.text}
+                  placeholder={t('viaPh')}
+                  onChange={(text) => updateVia(v.key, { text, pick: null })}
+                  onSelect={(p) => updateVia(v.key, { text: p.label, pick: { lat: p.lat, lng: p.lng } })}
+                />
+                <div className="via-actions">
+                  <button
+                    type="button"
+                    className="via-btn"
+                    title={t('viaUp')}
+                    aria-label={`${t('viaUp')} (${i + 1})`}
+                    disabled={i === 0}
+                    onClick={() => moveVia(v.key, -1)}
+                  >
+                    ▲
+                  </button>
+                  <button
+                    type="button"
+                    className="via-btn"
+                    title={t('viaDown')}
+                    aria-label={`${t('viaDown')} (${i + 1})`}
+                    disabled={i === vias.length - 1}
+                    onClick={() => moveVia(v.key, 1)}
+                  >
+                    ▼
+                  </button>
+                  <button
+                    type="button"
+                    className="via-btn remove"
+                    title={t('viaRemove')}
+                    aria-label={`${t('viaRemove')} (${i + 1})`}
+                    onClick={() => removeVia(v.key)}
+                  >
+                    ✕
+                  </button>
+                </div>
+              </div>
+            ))}
+            {vias.length < MAX_VIAS && (
+              <button type="button" className="add-via-btn" onClick={addVia}>
+                ➕ {t('addVia')}
+              </button>
+            )}
             <PlaceInput
               value={toText}
               placeholder={t('toPh')}
@@ -1935,6 +2082,7 @@ export default function App() {
       <MapView
         route={route}
         altRoutes={altCoords}
+        routeVias={routeVias}
         stops={filtered}
         planIds={planIds}
         selectedId={selectedId}

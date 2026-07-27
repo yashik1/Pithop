@@ -18,18 +18,23 @@ interface OverpassElement {
   tags?: Record<string, string>;
 }
 
+// Radii are widened toward the app's search corridor and the result cap raised,
+// so dense stretches aren't truncated. They stay deliberately short of the full
+// corridor for food/fuel — those are the highest-density tags, and the public
+// Overpass servers start timing out when their discs grow much past this.
 function buildQuery(samples: LatLng[]): string {
   let body = '';
   for (const p of samples) {
     const pt = `${p.lat.toFixed(4)},${p.lng.toFixed(4)}`;
-    body += `node["tourism"="viewpoint"](around:8000,${pt});`;
-    body += `node["amenity"~"^(restaurant|cafe|fast_food|ice_cream)$"]["name"](around:3000,${pt});`;
-    body += `node["highway"~"^(rest_area|services)$"](around:8000,${pt});`;
-    body += `way["highway"~"^(rest_area|services)$"](around:8000,${pt});`;
-    body += `node["amenity"~"^(fuel|toilets)$"](around:3000,${pt});`;
-    body += `way["amenity"="fuel"](around:3000,${pt});`;
+    body += `node["tourism"="viewpoint"](around:10000,${pt});`;
+    body += `node["tourism"="picnic_site"](around:8000,${pt});`;
+    body += `node["amenity"~"^(restaurant|cafe|fast_food|ice_cream)$"]["name"](around:4500,${pt});`;
+    body += `node["highway"~"^(rest_area|services)$"](around:10000,${pt});`;
+    body += `way["highway"~"^(rest_area|services)$"](around:10000,${pt});`;
+    body += `node["amenity"~"^(fuel|toilets|charging_station)$"](around:4500,${pt});`;
+    body += `way["amenity"="fuel"](around:4500,${pt});`;
   }
-  return `[out:json][timeout:30];(${body});out center qt 1200;`;
+  return `[out:json][timeout:30];(${body});out center qt 2200;`;
 }
 
 async function runQuery(endpoint: string, query: string): Promise<OverpassElement[]> {
@@ -139,8 +144,18 @@ function categorizeOsm(tags: Record<string, string>): { category: CategoryId; ki
   if (tags.amenity === 'fuel') {
     return { category: 'rest', kind: 'fuel', name: tagName ?? (tags.brand != null ? String(tags.brand) : 'Fuel station') };
   }
+  if (tags.amenity === 'charging_station') {
+    return {
+      category: 'rest',
+      kind: 'charging_station',
+      name: tagName ?? (tags.brand != null ? String(tags.brand) : 'EV charging'),
+    };
+  }
   if (tags.amenity === 'toilets') {
     return { category: 'rest', kind: 'toilets', name: tagName ?? 'Public restrooms' };
+  }
+  if (tags.tourism === 'picnic_site') {
+    return { category: 'nature', kind: 'picnic_site', name: tagName ?? 'Picnic spot' };
   }
   return null;
 }
