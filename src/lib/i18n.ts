@@ -35,6 +35,7 @@ const en = {
   tagline: 'Fun stops, hidden gems and breaks along your drive',
   fromPh: 'From — city, address',
   toPh: 'To — city or address',
+  sheetDrag: 'Drag to resize the list',
   viaPh: 'Stop along the way — city or address',
   addVia: 'Add a stop',
   viaRemove: 'Remove this stop',
@@ -173,6 +174,7 @@ const dicts: Partial<Record<Lang, Partial<Record<TKey, string>>>> = {
   es: {
     tagline: 'Paradas divertidas, joyas ocultas y descansos en tu ruta',
     fromPh: 'Desde — ciudad, dirección', toPh: 'Hasta — ciudad o dirección',
+    sheetDrag: 'Arrastra para redimensionar la lista',
     viaPh: 'Parada en el camino — ciudad o dirección', addVia: 'Añadir una parada', viaRemove: 'Quitar esta parada',
     viaUp: 'Mover antes', viaDown: 'Mover después',
     find: 'Buscar paradas en el camino', drive: 'de viaje', stopsFound: '{n} paradas encontradas',
@@ -191,6 +193,7 @@ const dicts: Partial<Record<Lang, Partial<Record<TKey, string>>>> = {
   fr: {
     tagline: 'Des arrêts sympas, des pépites et des pauses sur votre route',
     fromPh: 'Départ — ville, adresse', toPh: 'Arrivée — ville ou adresse',
+    sheetDrag: 'Glissez pour redimensionner la liste',
     viaPh: 'Étape en route — ville ou adresse', addVia: 'Ajouter une étape', viaRemove: 'Supprimer cette étape',
     viaUp: 'Déplacer plus tôt', viaDown: 'Déplacer plus tard',
     find: 'Trouver des arrêts en chemin', drive: 'de route', stopsFound: '{n} arrêts trouvés',
@@ -209,6 +212,7 @@ const dicts: Partial<Record<Lang, Partial<Record<TKey, string>>>> = {
   de: {
     tagline: 'Coole Stopps, Geheimtipps und Pausen auf deiner Fahrt',
     fromPh: 'Von — Stadt, Adresse', toPh: 'Nach — Stadt oder Adresse',
+    sheetDrag: 'Ziehen, um die Liste zu vergrößern',
     viaPh: 'Zwischenstopp — Stadt oder Adresse', addVia: 'Stopp hinzufügen', viaRemove: 'Diesen Stopp entfernen',
     viaUp: 'Nach vorne verschieben', viaDown: 'Nach hinten verschieben',
     find: 'Stopps auf dem Weg finden', drive: 'Fahrt', stopsFound: '{n} Stopps gefunden',
@@ -227,6 +231,7 @@ const dicts: Partial<Record<Lang, Partial<Record<TKey, string>>>> = {
   pt: {
     tagline: 'Paradas divertidas, joias escondidas e pausas na sua viagem',
     fromPh: 'De — cidade, endereço', toPh: 'Para — cidade ou endereço',
+    sheetDrag: 'Arraste para redimensionar a lista',
     viaPh: 'Parada no caminho — cidade ou endereço', addVia: 'Adicionar parada', viaRemove: 'Remover esta parada',
     viaUp: 'Mover para antes', viaDown: 'Mover para depois',
     find: 'Encontrar paradas no caminho', drive: 'de viagem', stopsFound: '{n} paradas encontradas',
@@ -245,6 +250,7 @@ const dicts: Partial<Record<Lang, Partial<Record<TKey, string>>>> = {
   it: {
     tagline: 'Soste divertenti, gemme nascoste e pause lungo il viaggio',
     fromPh: 'Da — città, indirizzo', toPh: 'A — città o indirizzo',
+    sheetDrag: 'Trascina per ridimensionare l’elenco',
     viaPh: 'Tappa lungo il percorso — città o indirizzo', addVia: 'Aggiungi una tappa', viaRemove: 'Rimuovi questa tappa',
     viaUp: 'Sposta prima', viaDown: 'Sposta dopo',
     find: 'Trova soste lungo il percorso', drive: 'di viaggio', stopsFound: '{n} soste trovate',
@@ -263,6 +269,7 @@ const dicts: Partial<Record<Lang, Partial<Record<TKey, string>>>> = {
   nl: {
     tagline: 'Leuke stops, verborgen pareltjes en pauzes onderweg',
     fromPh: 'Van — stad, adres', toPh: 'Naar — stad of adres',
+    sheetDrag: 'Sleep om de lijst te vergroten',
     viaPh: 'Tussenstop — stad of adres', addVia: 'Stop toevoegen', viaRemove: 'Deze stop verwijderen',
     viaUp: 'Eerder plaatsen', viaDown: 'Later plaatsen',
     find: 'Vind stops onderweg', drive: 'rijden', stopsFound: '{n} stops gevonden',
@@ -281,6 +288,7 @@ const dicts: Partial<Record<Lang, Partial<Record<TKey, string>>>> = {
   ru: {
     tagline: 'Интересные остановки, скрытые жемчужины и паузы в пути',
     fromPh: 'Откуда — город, адрес', toPh: 'Куда — город или адрес',
+    sheetDrag: 'Потяните, чтобы изменить размер списка',
     viaPh: 'Остановка по пути — город или адрес', addVia: 'Добавить остановку', viaRemove: 'Удалить эту остановку',
     viaUp: 'Переместить раньше', viaDown: 'Переместить позже',
     find: 'Найти остановки по пути', drive: 'в пути', stopsFound: 'найдено остановок: {n}',
@@ -299,6 +307,7 @@ const dicts: Partial<Record<Lang, Partial<Record<TKey, string>>>> = {
   uk: {
     tagline: 'Цікаві зупинки, приховані перлини та паузи в дорозі',
     fromPh: 'Звідки — місто, адреса', toPh: 'Куди — місто чи адреса',
+    sheetDrag: 'Потягніть, щоб змінити розмір списку',
     viaPh: 'Зупинка в дорозі — місто чи адреса', addVia: 'Додати зупинку', viaRemove: 'Вилучити цю зупинку',
     viaUp: 'Перемістити раніше', viaDown: 'Перемістити пізніше',
     find: 'Знайти зупинки по дорозі', drive: 'у дорозі', stopsFound: 'знайдено зупинок: {n}',
@@ -317,6 +326,7 @@ const dicts: Partial<Record<Lang, Partial<Record<TKey, string>>>> = {
   pl: {
     tagline: 'Ciekawe przystanki, ukryte perełki i przerwy w podróży',
     fromPh: 'Skąd — miasto, adres', toPh: 'Dokąd — miasto lub adres',
+    sheetDrag: 'Przeciągnij, aby zmienić rozmiar listy',
     viaPh: 'Przystanek w drodze — miasto lub adres', addVia: 'Dodaj przystanek', viaRemove: 'Usuń ten przystanek',
     viaUp: 'Przenieś wcześniej', viaDown: 'Przenieś później',
     find: 'Znajdź przystanki po drodze', drive: 'jazdy', stopsFound: 'znaleziono przystanków: {n}',
@@ -335,6 +345,7 @@ const dicts: Partial<Record<Lang, Partial<Record<TKey, string>>>> = {
   tr: {
     tagline: 'Yol boyunca eğlenceli duraklar, gizli cevherler ve molalar',
     fromPh: 'Nereden — şehir, adres', toPh: 'Nereye — şehir veya adres',
+    sheetDrag: 'Listeyi yeniden boyutlandırmak için sürükleyin',
     viaPh: 'Yol üstü durak — şehir veya adres', addVia: 'Durak ekle', viaRemove: 'Bu durağı kaldır',
     viaUp: 'Öne al', viaDown: 'Sonraya al',
     find: 'Yol üstü durakları bul', drive: 'sürüş', stopsFound: '{n} durak bulundu',
@@ -353,6 +364,7 @@ const dicts: Partial<Record<Lang, Partial<Record<TKey, string>>>> = {
   ar: {
     tagline: 'محطات ممتعة وكنوز خفية واستراحات على طول رحلتك',
     fromPh: 'من — مدينة أو عنوان', toPh: 'إلى — مدينة أو عنوان',
+    sheetDrag: 'اسحب لتغيير حجم القائمة',
     viaPh: 'محطة في الطريق — مدينة أو عنوان', addVia: 'إضافة محطة', viaRemove: 'إزالة هذه المحطة',
     viaUp: 'تحريك إلى الأمام', viaDown: 'تحريك إلى الخلف',
     find: 'ابحث عن محطات في الطريق', drive: 'قيادة', stopsFound: 'تم العثور على {n} محطة',
@@ -371,6 +383,7 @@ const dicts: Partial<Record<Lang, Partial<Record<TKey, string>>>> = {
   hi: {
     tagline: 'रास्ते भर मज़ेदार पड़ाव, छुपे रत्न और ब्रेक',
     fromPh: 'कहाँ से — शहर, पता', toPh: 'कहाँ तक — शहर या पता',
+    sheetDrag: 'सूची का आकार बदलने के लिए खींचें',
     viaPh: 'रास्ते में रुकना — शहर या पता', addVia: 'एक पड़ाव जोड़ें', viaRemove: 'यह पड़ाव हटाएँ',
     viaUp: 'पहले ले जाएँ', viaDown: 'बाद में ले जाएँ',
     find: 'रास्ते में पड़ाव खोजें', drive: 'ड्राइव', stopsFound: '{n} पड़ाव मिले',
@@ -389,6 +402,7 @@ const dicts: Partial<Record<Lang, Partial<Record<TKey, string>>>> = {
   id: {
     tagline: 'Perhentian seru, permata tersembunyi, dan istirahat di perjalanan',
     fromPh: 'Dari — kota, alamat', toPh: 'Ke — kota atau alamat',
+    sheetDrag: 'Tarik untuk mengubah ukuran daftar',
     viaPh: 'Perhentian di jalan — kota atau alamat', addVia: 'Tambah perhentian', viaRemove: 'Hapus perhentian ini',
     viaUp: 'Pindah lebih awal', viaDown: 'Pindah lebih akhir',
     find: 'Cari perhentian di jalan', drive: 'berkendara', stopsFound: '{n} perhentian ditemukan',
@@ -407,6 +421,7 @@ const dicts: Partial<Record<Lang, Partial<Record<TKey, string>>>> = {
   vi: {
     tagline: 'Điểm dừng thú vị, viên ngọc ẩn và những lần nghỉ trên đường',
     fromPh: 'Từ — thành phố, địa chỉ', toPh: 'Đến — thành phố hoặc địa chỉ',
+    sheetDrag: 'Kéo để thay đổi kích thước danh sách',
     viaPh: 'Điểm dừng trên đường — thành phố hoặc địa chỉ', addVia: 'Thêm điểm dừng', viaRemove: 'Xóa điểm dừng này',
     viaUp: 'Chuyển lên trước', viaDown: 'Chuyển xuống sau',
     find: 'Tìm điểm dừng trên đường', drive: 'lái xe', stopsFound: 'Tìm thấy {n} điểm dừng',
@@ -425,6 +440,7 @@ const dicts: Partial<Record<Lang, Partial<Record<TKey, string>>>> = {
   zh: {
     tagline: '旅途中的有趣停靠、隐藏景点与休息点',
     fromPh: '出发地 — 城市、地址', toPh: '目的地 — 城市或地址',
+    sheetDrag: '拖动以调整列表大小',
     viaPh: '途经点 — 城市或地址', addVia: '添加途经点', viaRemove: '移除此途经点',
     viaUp: '上移', viaDown: '下移',
     find: '查找沿途停靠点', drive: '车程', stopsFound: '找到 {n} 个停靠点',
@@ -443,6 +459,7 @@ const dicts: Partial<Record<Lang, Partial<Record<TKey, string>>>> = {
   ja: {
     tagline: 'ドライブ途中の楽しい立ち寄り・隠れた名所・休憩',
     fromPh: '出発地 — 都市・住所', toPh: '目的地 — 都市または住所',
+    sheetDrag: 'ドラッグしてリストの高さを変更',
     viaPh: '経由地 — 都市または住所', addVia: '経由地を追加', viaRemove: 'この経由地を削除',
     viaUp: '前に移動', viaDown: '後に移動',
     find: '途中の立ち寄りを探す', drive: '運転', stopsFound: '{n} 件の立ち寄りが見つかりました',
@@ -461,6 +478,7 @@ const dicts: Partial<Record<Lang, Partial<Record<TKey, string>>>> = {
   ko: {
     tagline: '드라이브 중 즐거운 정차, 숨은 명소, 휴식',
     fromPh: '출발 — 도시, 주소', toPh: '도착 — 도시 또는 주소',
+    sheetDrag: '끌어서 목록 크기 조절',
     viaPh: '경유지 — 도시 또는 주소', addVia: '경유지 추가', viaRemove: '이 경유지 삭제',
     viaUp: '앞으로 이동', viaDown: '뒤로 이동',
     find: '경로 위 정차지 찾기', drive: '주행', stopsFound: '{n}개의 정차지를 찾음',

@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useVirtualizer } from '@tanstack/react-virtual';
 import { geocode } from './api/geocode';
 import { fetchRoutes, type RouteResult } from './api/route';
 import { fetchRoadsideStops } from './api/overpass';
@@ -178,6 +179,22 @@ function getPosition(): Promise<GeolocationPosition> {
 // Defensive String(): a rare POI can arrive with a non-string name (e.g. a
 // purely numeric OSM name), and this runs over every stop from every source —
 // it must never throw ("e.toLowerCase is not a function" killed whole searches).
+// Run a state change inside a View Transition when the browser supports one, so
+// the jump from the search form to the results view crossfades instead of
+// snapping. Falls back to applying the change directly everywhere else, and
+// opts out under reduced motion.
+function withViewTransition(apply: () => void): void {
+  const doc = document as Document & { startViewTransition?: (cb: () => void) => unknown };
+  if (
+    typeof doc.startViewTransition !== 'function' ||
+    window.matchMedia?.('(prefers-reduced-motion: reduce)').matches
+  ) {
+    apply();
+    return;
+  }
+  doc.startViewTransition(apply);
+}
+
 function normName(name: unknown): string {
   return String(name ?? '')
     .toLowerCase()
@@ -209,6 +226,10 @@ export default function App() {
   // button); when set, the search skips geocoding the typed text.
   const [fromPick, setFromPick] = useState<LatLng | null>(null);
   const [toPick, setToPick] = useState<LatLng | null>(null);
+  // The sidebar is the scroll container for the results list; listRef marks
+  // where the list starts inside it (see the virtualiser below).
+  const sidebarRef = useRef<HTMLElement | null>(null);
+  const listRef = useRef<HTMLDivElement | null>(null);
   // Intermediate stops the traveller wants the route to pass through, in order.
   const [vias, setVias] = useState<Via[]>([]);
   // Resolved coordinates of the vias on the active route — kept separately from
@@ -447,10 +468,13 @@ export default function App() {
   function handleLoadTrip(t: StoredTrip) {
     searchSeq.current++; // invalidates any in-flight search
     activeLibraryIdRef.current = t.id;
-    setBusy(null);
-    setError(null);
-    setNotice(null);
-    applyTrip(t);
+    // Start screen → full trip is a whole-view swap, so it crossfades.
+    withViewTransition(() => {
+      setBusy(null);
+      setError(null);
+      setNotice(null);
+      applyTrip(t);
+    });
   }
 
   function handleDeleteTrip(t: StoredTrip) {
@@ -777,6 +801,10 @@ export default function App() {
   function clearTrip() {
     if (planIds.size > 0 && !window.confirm('Clear this trip? Your stop list will be lost.')) return;
     searchSeq.current++; // invalidates any in-flight search
+    withViewTransition(() => resetTrip());
+  }
+
+  function resetTrip() {
     setRoute(null);
     setRouteLabel('');
     setStops([]);
@@ -896,6 +924,124 @@ export default function App() {
 
   const plan = useMemo(() => stops.filter((s) => planIds.has(s.id)), [stops, planIds]);
   const planExtraMin = plan.reduce((sum, s) => sum + s.visitMin + s.detourMin, 0);
+
+  // --- Virtualised results list ---------------------------------------------
+  // The list can run to LIST_CAP cards; rendering them all is what made
+  // scrolling stutter on mid-range phones. Only the rows near the viewport are
+  // mounted. The scroll container is the whole sidebar (search form, summary
+  // and filters scroll with the list), so the virtualiser is told where the
+  // list starts within it via scrollMargin, and measures each row because card
+  // heights vary with description, badges and the expanded detail panel.
+  const visible = useMemo(() => filtered.slice(0, LIST_CAP), [filtered]);
+  const [listTop, setListTop] = useState(0);
+
+  const rowVirtualizer = useVirtualizer({
+    count: visible.length,
+    getScrollElement: () => sidebarRef.current,
+    estimateSize: () => 96,
+    scrollMargin: listTop,
+    overscan: 8,
+    getItemKey: (i) => visible[i]?.id ?? i,
+  });
+
+  // Where the list begins inside the sidebar's scrollable content. Re-measured
+  // when anything above it changes height (route summary, filters, plan panel).
+  useEffect(() => {
+    const el = listRef.current;
+    const scroller = sidebarRef.current;
+    if (!el || !scroller) return;
+    const measure = () => {
+      const top = el.getBoundingClientRect().top - scroller.getBoundingClientRect().top + scroller.scrollTop;
+      setListTop((prev) => (Math.abs(prev - top) > 1 ? top : prev));
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(scroller);
+    for (const child of Array.from(scroller.children)) ro.observe(child);
+    return () => ro.disconnect();
+  }, [route, stops.length, plan.length, routeAlts.length, spareMin, bingoOn, rouletteStop]);
+
+  // Entrance animation is only for the batch that lands after a search. Without
+  // this gate, virtualised rows would fade in as the traveller scrolls, which
+  // reads as the list redrawing itself.
+  const [entering, setEntering] = useState(false);
+  const hadStops = useRef(false);
+  useEffect(() => {
+    if (stops.length > 0 && !hadStops.current) {
+      hadStops.current = true;
+      setEntering(true);
+      // Longer than the animation plus the largest stagger delay, so removing
+      // the class never truncates a running animation.
+      const timer = window.setTimeout(() => setEntering(false), 900);
+      return () => window.clearTimeout(timer);
+    }
+    if (stops.length === 0) hadStops.current = false;
+  }, [stops.length]);
+
+  // --- Draggable sheet (mobile) ---------------------------------------------
+  // Below 768px the sidebar is styled as a bottom sheet with a grabber, but the
+  // grabber did nothing — it looked draggable and wasn't. Dragging it now snaps
+  // between three heights so the map can be opened up or the list filled out.
+  // Height is driven by a CSS var the media query consumes, so desktop is
+  // untouched. Snap fractions are of the viewport.
+  const SNAPS = [0.3, 0.55, 0.92];
+  const [snap, setSnap] = useState(1);
+  const dragRef = useRef<{ startY: number; startH: number; t: number; moved: boolean } | null>(null);
+  const [dragH, setDragH] = useState<number | null>(null);
+
+  function sheetPointerDown(e: React.PointerEvent) {
+    if (window.innerWidth > 768) return;
+    const el = sidebarRef.current;
+    if (!el) return;
+    // Capture so the drag survives the pointer leaving the grabber.
+    (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId);
+    dragRef.current = { startY: e.clientY, startH: el.getBoundingClientRect().height, t: Date.now(), moved: false };
+  }
+
+  function sheetPointerMove(e: React.PointerEvent) {
+    const d = dragRef.current;
+    if (!d) return;
+    // Dragging down (positive dy) shrinks the sheet.
+    let h = d.startH - (e.clientY - d.startY);
+    const min = window.innerHeight * SNAPS[0];
+    const max = window.innerHeight * SNAPS[SNAPS.length - 1];
+    // Past the ends, keep moving but with resistance — a hard stop feels broken.
+    if (h > max) h = max + (h - max) * 0.2;
+    if (h < min) h = min - (min - h) * 0.2;
+    if (Math.abs(e.clientY - d.startY) > 4) d.moved = true;
+    setDragH(h);
+  }
+
+  function sheetPointerUp(e: React.PointerEvent) {
+    const d = dragRef.current;
+    dragRef.current = null;
+    if (!d || !d.moved) {
+      setDragH(null);
+      return;
+    }
+    const dy = e.clientY - d.startY;
+    const velocity = Math.abs(dy) / Math.max(1, Date.now() - d.t);
+    const heights = SNAPS.map((f) => window.innerHeight * f);
+    const current = d.startH - dy;
+    // A quick flick moves one stop in its direction regardless of distance;
+    // otherwise settle on whichever snap point is nearest.
+    let next: number;
+    if (velocity > 0.5) {
+      next = dy > 0 ? Math.max(0, snap - 1) : Math.min(SNAPS.length - 1, snap + 1);
+    } else {
+      next = heights.reduce((best, h, i) => (Math.abs(h - current) < Math.abs(heights[best] - current) ? i : best), 0);
+    }
+    setSnap(next);
+    setDragH(null);
+  }
+
+  // Selecting a card grows it; re-measure so the rows below shift correctly.
+  const measureRow = useCallback(
+    (el: HTMLDivElement | null) => {
+      if (el) rowVirtualizer.measureElement(el);
+    },
+    [rowVirtualizer],
+  );
 
   // "Surprise me": auto-fill the plan with the best stops that fit the spare
   // time. Works over the filtered list, so an active vibe gives a themed trip.
@@ -1350,8 +1496,24 @@ export default function App() {
 
   return (
     <div className="app">
-      <aside className="sidebar">
+      <aside
+        className={`sidebar${dragH !== null ? ' dragging' : ''}`}
+        ref={sidebarRef}
+        data-snap={snap}
+        style={dragH !== null ? ({ '--sheet-h': `${dragH}px` } as React.CSSProperties) : undefined}
+      >
         <div className="hero">
+          {/* The grabber: drag target for the mobile sheet. Hidden on desktop by
+              the media query, where the sidebar is a fixed-width column. */}
+          <div
+            className="sheet-grab"
+            role="separator"
+            aria-label={t('sheetDrag')}
+            onPointerDown={sheetPointerDown}
+            onPointerMove={sheetPointerMove}
+            onPointerUp={sheetPointerUp}
+            onPointerCancel={sheetPointerUp}
+          />
           <header className="brand">
             <div className="brand-top">
             <h1>
@@ -1646,6 +1808,25 @@ export default function App() {
           </div>
         )}
 
+        {/* Placeholder cards while the first batch of stops is still loading.
+            They occupy roughly the space real cards will, so the list doesn't
+            jump when results land, and they make the wait read as "filling in"
+            rather than "nothing is happening". */}
+        {busy && stops.length === 0 && (
+          <div className="skeletons" aria-hidden="true">
+            {[0, 1, 2, 3, 4].map((i) => (
+              <div className="skeleton-card" key={i} style={{ animationDelay: `${i * 90}ms` }}>
+                <div className="sk sk-icon" />
+                <div className="sk-body">
+                  <div className="sk sk-line w70" />
+                  <div className="sk sk-line w45" />
+                </div>
+                <div className="sk sk-add" />
+              </div>
+            ))}
+          </div>
+        )}
+
         {route && !busy && (
           <div className="summary">
             <div className="summary-actions">
@@ -1901,7 +2082,14 @@ export default function App() {
                 {filtered.length} match{filtered.length === 1 ? '' : 'es'}
                 {filtered.length > LIST_CAP ? ` · showing first ${LIST_CAP}` : ''}
               </div>
-              {filtered.slice(0, LIST_CAP).map((s) => {
+              <div
+                className="stop-rows"
+                ref={listRef}
+                style={{ height: rowVirtualizer.getTotalSize(), position: 'relative' }}
+              >
+              {rowVirtualizer.getVirtualItems().map((row) => {
+                const s = visible[row.index];
+                if (!s) return null;
                 const c = CATEGORY_MAP[s.category];
                 const added = planIds.has(s.id);
                 const selected = selectedId === s.id;
@@ -1916,7 +2104,16 @@ export default function App() {
                 return (
                   <div
                     key={s.id}
-                    className={`stop-card${selected ? ' selected' : ''}`}
+                    className="stop-row"
+                    data-index={row.index}
+                    ref={measureRow}
+                    style={{ transform: `translateY(${row.start - listTop}px)` }}
+                  >
+                  <div
+                    className={`stop-card${selected ? ' selected' : ''}${
+                      entering && row.index < 12 ? ' entering' : ''
+                    }`}
+                    style={entering && row.index < 12 ? { animationDelay: `${row.index * 30}ms` } : undefined}
                     role="button"
                     tabIndex={0}
                     aria-expanded={selected}
@@ -2015,8 +2212,10 @@ export default function App() {
                       {added ? '✓' : '+'}
                     </button>
                   </div>
+                  </div>
                 );
               })}
+              </div>
             </div>
           </>
         )}

@@ -9,6 +9,42 @@ import { addTilesWithFailover, tileProviders } from './lib/tiles';
 import { hoursStatus, prettyHours } from './lib/hours';
 import { catLabel, t, type Lang } from './lib/i18n';
 
+// The map runs with preferCanvas so the many stop markers stay cheap, but a
+// canvas layer has no DOM node to animate. The active route — a single path — is
+// therefore drawn by its own SVG renderer, which costs nothing at this scale and
+// gives the draw-in below something to animate. Created lazily and shared.
+let svgRenderer: L.SVG | null = null;
+function routeRenderer(): L.SVG {
+  if (!svgRenderer) svgRenderer = L.svg({ padding: 0.5 });
+  return svgRenderer;
+}
+
+// Trace the route on rather than having it appear fully formed — the sweep from
+// origin to destination is what makes the shape of the drive readable at a
+// glance. Uses the Web Animations API on the polyline's own SVG path, so it runs
+// off the main thread while stops are still being fetched. Skipped entirely for
+// reduced motion, and for very long paths where dash maths gets expensive.
+function drawInRoute(line: L.Polyline): void {
+  const path = (line as unknown as { _path?: SVGPathElement })._path;
+  if (!path || typeof path.getTotalLength !== 'function') return;
+  if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return;
+  let len = 0;
+  try {
+    len = path.getTotalLength();
+  } catch {
+    return; // not laid out yet
+  }
+  if (!Number.isFinite(len) || len <= 0 || len > 200_000) return;
+  path.animate(
+    [
+      { strokeDasharray: `${len} ${len}`, strokeDashoffset: `${len}` },
+      { strokeDasharray: `${len} ${len}`, strokeDashoffset: '0' },
+    ],
+    // Long enough to read as drawing, short enough not to delay the trip.
+    { duration: 650, easing: 'cubic-bezier(0.23, 1, 0.32, 1)', fill: 'none' },
+  );
+}
+
 export interface LivePos {
   lat: number;
   lng: number;
@@ -234,8 +270,9 @@ export function MapView({
       );
     }
     const latlngs = route.coords.map((c) => [c.lat, c.lng] as [number, number]);
-    const line = L.polyline(latlngs, { color: '#2563eb', weight: 5, opacity: 0.7 });
+    const line = L.polyline(latlngs, { color: '#2563eb', weight: 5, opacity: 0.7, renderer: routeRenderer() });
     layer.addLayer(line);
+    drawInRoute(line);
     const endpoint = (pos: [number, number], html: string) =>
       L.marker(pos, {
         icon: L.divIcon({ className: 'endpoint', html, iconSize: [28, 28], iconAnchor: [14, 24] }),
