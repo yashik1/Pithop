@@ -29,9 +29,13 @@
   --shadow-2: 0 4px 10px rgba(16, 29, 51, 0.08), 0 12px 28px rgba(16, 29, 51, 0.1);
   --shadow-3: 0 14px 40px rgba(16, 29, 51, 0.22);
 
-  /* Motion */
+  /* Motion. The stock CSS easings are too weak to read as intentional, so
+     these are stronger custom curves: --ease-out decelerates hard, which is
+     what makes a tap feel like it landed instantly. --ease-in-out is for
+     things moving across the screen rather than entering or leaving it. */
   --spring: cubic-bezier(0.34, 1.56, 0.64, 1);
-  --ease-out: cubic-bezier(0.22, 0.9, 0.35, 1);
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
 }
 
 * {
@@ -410,11 +414,16 @@ body {
   font-size: 11px;
   line-height: 1;
   cursor: pointer;
-  transition: background 0.15s var(--ease-out), opacity 0.15s var(--ease-out);
+  transition: background 0.15s var(--ease-out), opacity 0.15s var(--ease-out),
+    transform 0.12s var(--ease-out);
 }
 
 .via-btn:hover:not(:disabled) {
   background: rgba(255, 255, 255, 0.3);
+}
+
+.via-btn:active:not(:disabled) {
+  transform: scale(0.9);
 }
 
 .via-btn:disabled {
@@ -437,11 +446,15 @@ body {
   font-size: 12.5px;
   font-weight: 700;
   cursor: pointer;
-  transition: background 0.15s var(--ease-out);
+  transition: background 0.15s var(--ease-out), transform 0.12s var(--ease-out);
 }
 
 .add-via-btn:hover {
   background: rgba(255, 255, 255, 0.16);
+}
+
+.add-via-btn:active {
+  transform: scale(0.97);
 }
 
 .place-input {
@@ -582,9 +595,13 @@ body {
   transition: transform 0.15s var(--ease-out), box-shadow 0.15s var(--ease-out);
 }
 
-.go-btn:hover:not(:disabled) {
-  transform: translateY(-1px);
-  box-shadow: 0 8px 20px rgba(13, 25, 48, 0.28);
+/* Gated: a touch device fires :hover on tap and leaves the button stuck in the
+   lifted state afterwards, so the lift is for real pointers only. */
+@media (hover: hover) and (pointer: fine) {
+  .go-btn:hover:not(:disabled) {
+    transform: translateY(-1px);
+    box-shadow: 0 8px 20px rgba(13, 25, 48, 0.28);
+  }
 }
 
 .go-btn:active:not(:disabled) {
@@ -1016,12 +1033,17 @@ body {
   font-size: 13.5px;
   font-weight: 700;
   cursor: pointer;
-  transition: border-color 0.15s var(--ease-out), color 0.15s var(--ease-out);
+  transition: border-color 0.15s var(--ease-out), color 0.15s var(--ease-out),
+    transform 0.12s var(--ease-out);
 }
 
 .plan-share:hover {
   border-color: var(--primary);
   color: var(--primary-deep);
+}
+
+.plan-share:active {
+  transform: scale(0.97);
 }
 
 .plan-time {
@@ -1091,7 +1113,7 @@ body {
   cursor: pointer;
   transition: transform 0.18s var(--ease-out), box-shadow 0.18s var(--ease-out),
     border-color 0.18s var(--ease-out), background 0.18s var(--ease-out);
-  animation: rise-in 0.4s var(--ease-out) backwards;
+  animation: rise-in 0.26s var(--ease-out) backwards;
 }
 
 /* Staggered entrance for the first screenful (header is child 1). */
@@ -1132,7 +1154,7 @@ body {
   animation-delay: 0.36s;
 }
 
-@media (hover: hover) {
+@media (hover: hover) and (pointer: fine) {
   .stop-card:hover {
     transform: translateY(-2px);
     box-shadow: var(--shadow-2);
@@ -1764,13 +1786,32 @@ body {
 
 /* ---------- Reduced motion ---------- */
 
+/* Reduced motion means less movement, not no feedback. Position and scale
+   changes go away; fades, colour and shadow changes stay, because those are
+   what tell a traveller a tap registered or a panel changed state. */
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
   *::after {
+    transition-property: opacity, color, background-color, border-color, box-shadow, filter !important;
+    transition-duration: 0.12s !important;
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
+    /* Without this, a staggered card sits in its hidden from-state for the
+       length of its delay before snapping in. */
+    animation-delay: 0ms !important;
+  }
+
+  /* Progress indicators are the exception: a frozen spinner reads as a hung
+     app, which is worse than the motion it avoids. These keep looping — just
+     slower and, where possible, as a pulse rather than travel. */
+  .sidebar:has(.go-btn.busy) .hero::after,
+  .geo-btn.locating,
+  .go-btn.busy,
+  .go-btn.busy::before,
+  .live-dot::before {
+    animation-duration: 2s !important;
+    animation-iteration-count: infinite !important;
   }
 }
 
@@ -2338,7 +2379,12 @@ body {
   font-size: 12.5px;
   font-weight: 700;
   cursor: pointer;
-  transition: background 0.15s var(--ease-out), opacity 0.15s var(--ease-out);
+  transition: background 0.15s var(--ease-out), opacity 0.15s var(--ease-out),
+    transform 0.12s var(--ease-out);
+}
+
+.avoid-chip:active:not(:disabled) {
+  transform: scale(0.96);
 }
 
 .avoid-chip.active {
@@ -2371,7 +2417,12 @@ body {
   font-size: 13px;
   font-weight: 700;
   cursor: pointer;
-  transition: border-color 0.15s var(--ease-out), color 0.15s var(--ease-out), background 0.15s var(--ease-out);
+  transition: border-color 0.15s var(--ease-out), color 0.15s var(--ease-out), background 0.15s var(--ease-out),
+    transform 0.12s var(--ease-out);
+}
+
+.route-alt:active {
+  transform: scale(0.96);
 }
 
 .route-alt.active {
