@@ -5,9 +5,12 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta
       name="description"
-      content="Pithop is a free road-trip planner. Enter where you're driving from and to, and it maps your route and finds the best stops along the way — scenic viewpoints, quirky attractions, nature, history, museums and food — then guides you there with live in-browser navigation. No download required."
+      content="Pithop is a free road trip planner. Enter where you're driving from and to, and it maps your route and finds the best stops along the way — scenic viewpoints, quirky attractions, nature, history, museums and food — then guides you there with live in-browser navigation. No download required."
     />
     <meta name="theme-color" content="#2563eb" />
+    <!-- max-image-preview:large lets Google use the full-size preview image in
+         results and Discover; the defaults would show a thumbnail or nothing. -->
+    <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1" />
     <link rel="icon" href="/icon.svg" type="image/svg+xml" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <link rel="manifest" href="/manifest.webmanifest" />
@@ -15,7 +18,7 @@
     <!-- Rich link previews on WhatsApp, Discord, iMessage, X, etc. -->
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="Pithop" />
-    <meta property="og:title" content="Pithop — fun stops on long drives" />
+    <meta property="og:title" content="Pithop — Road Trip Planner for Fun Stops Along the Way" />
     <meta
       property="og:description"
       content="Type where you're driving from and to — Pithop finds viewpoints, quirky attractions, food and hidden gems along the way, then navigates you there. Free, in your browser."
@@ -25,13 +28,69 @@
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
     <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content="Pithop — fun stops on long drives" />
+    <meta name="twitter:title" content="Pithop — Road Trip Planner for Fun Stops Along the Way" />
     <meta
       name="twitter:description"
       content="Type where you're driving from and to — Pithop finds the stops worth pulling over for. Free, in your browser."
     />
     <meta name="twitter:image" content="https://pithop.com/og.png" />
-    <title>Pithop — fun stops on long drives</title>
+    <!-- The title is the strongest on-page ranking signal, so it leads with the
+         phrase people actually type ("road trip planner") rather than the
+         brand's own turn of phrase. Kept under ~60 characters so Google shows
+         it whole instead of truncating it. -->
+    <title>Pithop — Road Trip Planner for Fun Stops Along the Way</title>
+    <!-- Structured data. This is a data block, not executable JavaScript, so the
+         Content-Security-Policy's script-src does not apply to it and no
+         unsafe-inline is needed. Tells Google what kind of thing Pithop is, which
+         is what qualifies a result for an app rich card rather than a plain link. -->
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@graph": [
+          {
+            "@type": "WebApplication",
+            "@id": "https://pithop.com/#app",
+            "name": "Pithop",
+            "url": "https://pithop.com/",
+            "description": "A free road trip planner that maps your route and finds the best stops along the way — scenic viewpoints, quirky roadside attractions, nature, history, museums and food — then guides you there with live in-browser navigation.",
+            "applicationCategory": "TravelApplication",
+            "operatingSystem": "Any (web browser)",
+            "browserRequirements": "Requires JavaScript",
+            "image": "https://pithop.com/og.png",
+            "screenshot": "https://pithop.com/og.png",
+            "offers": {
+              "@type": "Offer",
+              "price": "0",
+              "priceCurrency": "USD"
+            },
+            "featureList": [
+              "Find stops along a driving route",
+              "Add multiple stops and reorder them",
+              "Filter stops by category, detour time and visit length",
+              "Route options including toll-free and avoid highways",
+              "Live turn-by-turn navigation with voice directions",
+              "Opening hours checked against your arrival time",
+              "Save trips offline and share them by link"
+            ]
+          },
+          {
+            "@type": "WebSite",
+            "@id": "https://pithop.com/#website",
+            "url": "https://pithop.com/",
+            "name": "Pithop",
+            "description": "Road trip planner for finding fun stops along your drive.",
+            "publisher": { "@id": "https://pithop.com/#org" }
+          },
+          {
+            "@type": "Organization",
+            "@id": "https://pithop.com/#org",
+            "name": "Pithop",
+            "url": "https://pithop.com/",
+            "logo": "https://pithop.com/icon-512.png"
+          }
+        ]
+      }
+    </script>
     <!-- Theme + text direction before first paint; external file so the
          Content-Security-Policy needs no unsafe-inline for scripts. -->
     <script src="/theme-init.js"></script>
@@ -92,14 +151,19 @@
       <!-- Replaced by the app on load; present so the home page explains
            itself without JavaScript (for crawlers and OAuth review). -->
       <div class="preload">
-        <h1>🛣️ Pithop</h1>
-        <p class="lede">A free road-trip planner that finds the best stops along your route.</p>
+        <h1>🛣️ Pithop — Road Trip Planner</h1>
+        <p class="lede">A free road trip planner that finds the best stops along your route.</p>
         <p>
           Enter where you're driving from and to, and Pithop maps your route and finds interesting places to stop
           along the way — scenic viewpoints, quirky roadside attractions, nature and parks, history, museums, and
-          food — filtered by how far off your route they are and how long you'd like to stop. Save your trips,
-          follow them with live in-browser navigation and voice directions, and optionally sign in to share great
-          places with other travellers. It runs in your browser with nothing to download.
+          food — filtered by how far off your route they are and how long you'd like to stop. Add multiple stops
+          along the way, compare route options including toll-free ones, and see whether a place will still be
+          open by the time you get there.
+        </p>
+        <p>
+          Save your trips for offline use, follow them with live in-browser navigation and voice turn-by-turn
+          directions, and optionally sign in to share great places with other travellers. It runs in your browser
+          with nothing to download, and works on phones, tablets and desktops.
         </p>
         <p class="loading">Loading the map…</p>
       </div>

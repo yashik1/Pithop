@@ -1,0 +1,15 @@
+# Pithop — https://pithop.com
+# Everything user-facing is welcome in search results.
+
+User-agent: *
+Allow: /
+
+# The OAuth popup is a machine-to-machine handoff page: it carries no content,
+# and a sign-in fragment in a search result would be both useless and confusing.
+Disallow: /auth-popup.html
+
+# Hashed build assets are not pages. Excluding them keeps crawl budget on
+# content without hiding anything Google needs to render the app.
+Disallow: /assets/
+
+Sitemap: https://pithop.com/sitemap.xml

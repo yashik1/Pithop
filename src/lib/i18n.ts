@@ -32,7 +32,7 @@ export const LANGUAGES: Array<{ code: Lang; name: string; dir?: 'rtl' }> = [
 // Every translatable string, keyed. English values are what the UI shows when a
 // language omits a key.
 const en = {
-  tagline: 'Fun stops, hidden gems and breaks along your drive',
+  tagline: 'Road trip planner — fun stops and hidden gems along your drive',
   fromPh: 'From — city, address',
   toPh: 'To — city or address',
   sheetDrag: 'Drag to resize the list',
