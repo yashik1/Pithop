@@ -1,8 +1,8 @@
 {
   "id": "/",
-  "name": "Pithop — fun stops on long drives",
+  "name": "Pithop — Road Trip Planner for Fun Stops Along the Way",
   "short_name": "Pithop",
-  "description": "Free road-trip planner: enter where you're driving from and to, and Pithop finds scenic viewpoints, quirky attractions, nature, history and food along your route, then guides you there with live navigation.",
+  "description": "Free road trip planner: enter where you're driving from and to, and Pithop maps your route and finds the best stops along the way — scenic viewpoints, quirky attractions, nature, history, museums and food — then guides you there with live navigation.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
@@ -11,13 +11,42 @@
   "theme_color": "#2563eb",
   "lang": "en",
   "dir": "ltr",
-  "categories": ["travel", "navigation", "maps"],
+  "categories": [
+    "travel",
+    "navigation",
+    "maps"
+  ],
   "icons": [
-    { "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
-    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
-    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
-    { "src": "/icon-maskable-192.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable" },
-    { "src": "/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon-maskable-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
   ],
   "screenshots": [
     {
