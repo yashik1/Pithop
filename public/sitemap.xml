@@ -1,26 +1,23 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
-  Pithop is a single-page app: the trip itself lives in the URL fragment
-  (#trip=...), which search engines neither crawl nor index, so shared trip
-  links are deliberately absent. Only the three real pages are listed.
+  Only pages that are actually meant to be indexed belong here.
+
+  Pithop is a single-page app, so that is the home page alone. The trip itself
+  lives in the URL fragment (#trip=...), which search engines neither crawl nor
+  index, so shared trip links are deliberately absent.
+
+  privacy.html and terms.html are deliberately NOT listed: both carry
+  <meta name="robots" content="noindex">. Listing a noindex page in a sitemap
+  asks Google to index something the page itself refuses, which wastes crawl
+  budget and shows up in Search Console as "Discovered - currently not indexed".
+  If either page is ever meant to be indexed, remove its noindex tag first, then
+  add it back here.
 -->
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url>
     <loc>https://pithop.com/</loc>
-    <lastmod>2026-07-31</lastmod>
+    <lastmod>2026-08-16</lastmod>
     <changefreq>weekly</changefreq>
     <priority>1.0</priority>
-  </url>
-  <url>
-    <loc>https://pithop.com/privacy.html</loc>
-    <lastmod>2026-07-31</lastmod>
-    <changefreq>yearly</changefreq>
-    <priority>0.3</priority>
-  </url>
-  <url>
-    <loc>https://pithop.com/terms.html</loc>
-    <lastmod>2026-07-31</lastmod>
-    <changefreq>yearly</changefreq>
-    <priority>0.3</priority>
   </url>
 </urlset>
