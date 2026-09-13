@@ -1,10 +1,7 @@
 // Optional commercial-grade provider (geoapify.com). When VITE_GEOAPIFY_API_KEY
-// is set, Geoapify replaces the free public OSM servers for autocomplete,
+// is set, Geoapify replaces the free public OSM servers — tiles, autocomplete,
 // geocoding, routing, roadside POIs and lodging — whose usage policies disallow
 // or discourage commercial apps. Without a key the app stays on the free stack.
-//
-// Map TILES are the exception: they always come from the keyless providers in
-// lib/tileProviders.ts, whatever is configured here. See the note there.
 //
 // Geoapify uses open data and allows commercial use with attribution; restrict
 // the key to your domain in their dashboard since it ships to the browser.
@@ -28,11 +25,15 @@ export function hasGeoapify(): boolean {
   return KEY.length > 0;
 }
 
-// Geoapify tiles are deliberately NOT used as a base map. See lib/tiles.ts:
-// the keyless providers cover every case, they cost nothing, and a rejected
-// Geoapify key renders an error image inside the map rather than failing in a
-// way the code can detect. Geoapify still powers routing, places and geocoding,
-// where a failure surfaces as an exception that the app can fall back from.
+export function geoapifyTileLayer(): { url: string; attribution: string } {
+  // {r} → '@2x' on high-DPI screens (Leaflet fills it in): crisp retina tiles.
+  return {
+    url: `https://maps.geoapify.com/v1/tile/osm-bright/{z}/{x}/{y}{r}.png?apiKey=${KEY}`,
+    attribution:
+      'Powered by <a href="https://www.geoapify.com/">Geoapify</a> | ' +
+      '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+  };
+}
 
 interface GeoFeature {
   geometry: { type: string; coordinates: any };

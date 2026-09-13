@@ -1,39 +1,64 @@
-import { describe, it, expect } from 'vitest';
-import { tileProviders } from '../tileProviders';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+
+// hasGeoapify()/geoapifyTileLayer() read an import.meta.env value at module
+// load, so the provider module is imported fresh per test with the Geoapify
+// module mocked to the state under test.
+async function providersWithKey(hasKey: boolean) {
+  vi.resetModules();
+  vi.doMock('../../api/geoapify', () => ({
+    hasGeoapify: () => hasKey,
+    geoapifyTileLayer: () => ({
+      url: 'https://maps.geoapify.com/v1/tile/osm-bright/{z}/{x}/{y}{r}.png?apiKey=test',
+      attribution: 'Powered by Geoapify | &copy; OpenStreetMap contributors',
+    }),
+  }));
+  const mod = await import('../tileProviders');
+  return mod.tileProviders();
+}
+
+beforeEach(() => vi.resetModules());
+afterEach(() => vi.doUnmock('../../api/geoapify'));
 
 describe('tileProviders', () => {
-  it('offers three providers to fall through', () => {
-    expect(tileProviders()).toHaveLength(3);
-  });
-
-  it('uses only keyless tile sources', () => {
-    // The map must never be able to render a provider's "API key required"
-    // image: that arrives as a successful tile load, so no amount of failover
-    // logic can detect it. Keeping every source keyless removes the failure
-    // mode rather than trying to recover from it.
-    for (const p of tileProviders()) {
-      expect(p.url, p.url).not.toMatch(/apikey|api_key|access_token|\{key\}/i);
-      expect(p.url, p.url).not.toMatch(/geoapify/i);
+  it('never serves Carto basemaps', async () => {
+    // Carto's keyless raster tiles now answer with an image that has "API KEY
+    // REQUIRED" printed on it, delivered as HTTP 200. Leaflet counts that as a
+    // successful load, so no failover can catch it and the watermark covers the
+    // whole map. The only defence is never requesting them.
+    for (const hasKey of [true, false]) {
+      for (const p of await providersWithKey(hasKey)) {
+        expect(p.url, `hasKey=${hasKey}`).not.toMatch(/carto/i);
+      }
     }
   });
 
-  it('leads with Carto Voyager and keeps OSM mirrors behind it', () => {
-    const [first, ...rest] = tileProviders();
-    expect(first.url).toMatch(/cartocdn/);
-    expect(rest.some((p) => /tile\.openstreetmap\.org/.test(p.url))).toBe(true);
-    expect(rest.some((p) => /tile\.openstreetmap\.de/.test(p.url))).toBe(true);
+  it('falls back to keyless OSM servers when no key is configured', async () => {
+    const list = await providersWithKey(false);
+    expect(list.length).toBeGreaterThanOrEqual(2);
+    for (const p of list) expect(p.url).not.toMatch(/apikey/i);
+    expect(list[0].url).toMatch(/tile\.openstreetmap\.org/);
   });
 
-  it('serves every provider over https and credits OpenStreetMap', () => {
-    for (const p of tileProviders()) {
-      expect(p.url.startsWith('https://'), p.url).toBe(true);
-      expect(p.attribution).toMatch(/OpenStreetMap/);
+  it('leads with the paid provider when a key is configured', async () => {
+    const list = await providersWithKey(true);
+    expect(list[0].url).toMatch(/geoapify/);
+    // Keyless backups must still sit behind it, on separate infrastructure.
+    expect(list.slice(1).some((p) => /tile\.openstreetmap\.org/.test(p.url))).toBe(true);
+    expect(list.slice(1).some((p) => /tile\.openstreetmap\.de/.test(p.url))).toBe(true);
+  });
+
+  it('always offers somewhere to fall back to', async () => {
+    for (const hasKey of [true, false]) {
+      expect((await providersWithKey(hasKey)).length).toBeGreaterThanOrEqual(2);
     }
   });
 
-  it('spreads Carto across subdomains so one host is not the bottleneck', () => {
-    const carto = tileProviders()[0];
-    expect(carto.url).toContain('{s}');
-    expect(carto.subdomains && carto.subdomains.length).toBeGreaterThan(1);
+  it('serves every provider over https and credits OpenStreetMap', async () => {
+    for (const hasKey of [true, false]) {
+      for (const p of await providersWithKey(hasKey)) {
+        expect(p.url.startsWith('https://'), p.url).toBe(true);
+        expect(p.attribution).toMatch(/OpenStreetMap/);
+      }
+    }
   });
 });

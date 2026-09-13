@@ -39,7 +39,7 @@ The app runs in one of two modes, switched by a single env var:
 | Driving route | [OSRM demo server](https://project-osrm.org/) (no SLA) | Geoapify Routing |
 | Landmarks & attractions | Wikipedia GeoSearch API | Wikipedia (always — CC BY-SA, attributed) |
 | Food, viewpoints, rest stops | [Overpass API](https://overpass-api.de/) (often busy) | Geoapify Places |
-| Map tiles | Carto Voyager → OpenStreetMap mirrors (keyless, with failover) | Same — tiles never use the key |
+| Map tiles | OpenStreetMap servers + Leaflet | Geoapify tiles, OSM as fallback |
 | Per-stop navigation | Google Maps deep links (plain URLs, no API — allowed) | same |
 
 Pipeline: geocode both endpoints → fetch route geometry from OSRM → sample the
