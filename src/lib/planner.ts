@@ -1,16 +1,29 @@
 // "Surprise Me": turn a spare-time budget into an itinerary. Each stop's cost
 // is its visit time plus its round-trip detour, so the plan honestly fits the
-// time the traveller has. Selection is greedy by score with category diversity
-// and along-route spacing, plus a pinch of randomness so tapping again deals a
-// fresh mix ("shuffle").
+// time the traveller has. Selection is greedy by Pithop Score with category
+// diversity and along-route spacing, plus a pinch of randomness so tapping
+// again deals a fresh mix ("shuffle").
+//
+// The quality judgement lives in score.ts and is deterministic; the randomness
+// is applied HERE, at the point of selection, so the score a traveller sees on
+// a card never moves under them.
 
 import type { Stop } from '../types';
 import type { CategoryId } from './categories';
+import { pithopScore, DEFAULT_PREFS, type ScoreContext, type TripPrefs } from './score';
 
 const MAX_PICKS = 12;
 const MIN_SPACING_KM = 8;
 
-export function surprisePlan(stops: Stop[], budgetMin: number): string[] {
+export function surprisePlan(
+  stops: Stop[],
+  budgetMin: number,
+  prefs: TripPrefs = DEFAULT_PREFS,
+  ctx: ScoreContext = {},
+): string[] {
+  // Score every candidate once up front — it does not depend on what has been
+  // picked so far, so recomputing it inside the loop would only cost time.
+  const scoreById = new Map(stops.map((s) => [s.id, pithopScore(s, prefs, ctx).score]));
   const picked: Stop[] = [];
   const catCount = new Map<CategoryId, number>();
   let remaining = budgetMin;
@@ -23,10 +36,9 @@ export function surprisePlan(stops: Stop[], budgetMin: number): string[] {
       if (cost > remaining || picked.includes(s)) continue;
       // Keep stops spread along the drive, not clustered in one town.
       if (picked.some((p) => Math.abs(p.alongKm - s.alongKm) < MIN_SPACING_KM)) continue;
-      // Quality: photos/descriptions signal genuinely interesting places;
-      // community stops are traveller-vouched gems.
-      const quality =
-        1 + (s.imageUrl ? 1.2 : 0) + (s.description ? 0.6 : 0) + (s.source === 'community' ? 0.8 : 0);
+      // Quality comes from the shared Pithop Score, so Surprise Me agrees with
+      // the number shown on the card rather than ranking by its own rules.
+      const quality = (scoreById.get(s.id) ?? 0) / 50; // ~0..2
       // Diversity: each repeat of a category is worth progressively less.
       const diversity = 1 / (1 + (catCount.get(s.category) ?? 0));
       // Efficiency: time spent enjoying vs. time spent detouring.
@@ -115,16 +127,5 @@ export function bingoLineCount(marked: boolean[]): number {
   return BINGO_LINES.filter((line) => line.every((i) => marked[i])).length;
 }
 
-// Trip vibes: one-tap presets over the category filter.
-export interface Theme {
-  id: 'weird' | 'foodie' | 'nature' | 'history';
-  emoji: string;
-  cats: CategoryId[];
-}
-
-export const THEMES: Theme[] = [
-  { id: 'weird', emoji: '🛸', cats: ['fun'] },
-  { id: 'foodie', emoji: '🍔', cats: ['food'] },
-  { id: 'nature', emoji: '🏞️', cats: ['nature', 'views'] },
-  { id: 'history', emoji: '🏛️', cats: ['history', 'museums'] },
-];
+// Trip vibes used to live here as four presets. They are now the thirteen trip
+// personalities in score.ts, which both filter the list and weight the ranking.

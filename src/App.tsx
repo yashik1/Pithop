@@ -24,10 +24,17 @@ import {
   buildBingoCard,
   rouletteSpin,
   surprisePlan,
-  THEMES,
   type BingoSquare,
-  type Theme,
 } from './lib/planner';
+import {
+  DEFAULT_PREFS,
+  PERSONALITIES,
+  isHiddenGem,
+  pithopScore,
+  type PersonalityId,
+  type ScoredStop,
+  type TripPrefs,
+} from './lib/score';
 import { hoursStatus, prettyHours } from './lib/hours';
 import {
   clearCurrentTrip,
@@ -307,7 +314,11 @@ export default function App() {
   voiceRef.current = voiceOn;
   // Surprise-me spare-time budget (minutes) and the active trip vibe.
   const [spareMin, setSpareMin] = useState<number | null>(null);
-  const [activeTheme, setActiveTheme] = useState<Theme['id'] | null>(null);
+  // Trip personalities are multi-select: they narrow the category filter AND
+  // weight the Pithop Score, so two travellers on the same road see different
+  // stops at the top.
+  const [personalities, setPersonalities] = useState<Set<PersonalityId>>(new Set());
+  const [gemsOnly, setGemsOnly] = useState(false);
   // Detour Roulette: the stop on the wheel, spin animation, chicken counter.
   const [rouletteStop, setRouletteStop] = useState<Stop | null>(null);
   const [rouletteSpinning, setRouletteSpinning] = useState(false);
@@ -882,7 +893,9 @@ export default function App() {
   }
 
   function toggleCat(id: CategoryId) {
-    setActiveTheme(null); // manual chip edits leave any one-tap vibe preset
+    // Hand-editing the category chips means the traveller is steering directly,
+    // so any personality preset stops claiming to describe the filter.
+    setPersonalities(new Set());
     setCats((prev) => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id);
@@ -900,17 +913,90 @@ export default function App() {
     });
   }
 
+  // The traveller's preferences, in the shape the scorer wants. Kept as one
+  // memo so every consumer (list, Don't Miss, Surprise Me) scores identically.
+  const prefs = useMemo<TripPrefs>(
+    () => ({ ...DEFAULT_PREFS, personalities: [...personalities], maxDetourMin: maxDetour }),
+    [personalities, maxDetour],
+  );
+
+  // Average speed of the chosen route, used to project an arrival clock time
+  // for each stop so opening hours are judged at arrival rather than "now".
+  const avgKmh = route && route.durationMin > 0 ? route.distanceKm / (route.durationMin / 60) : 70;
+  const etaOf = useCallback(
+    (alongKm: number) => new Date(Date.now() + (alongKm / avgKmh) * 3600_000),
+    [avgKmh],
+  );
+
+  // Pithop Score for every stop. Deterministic, so this is pure derived state.
+  const scoreById = useMemo(() => {
+    const out = new Map<string, ScoredStop>();
+    for (const s of stops) out.set(s.id, pithopScore(s, prefs, { eta: etaOf(s.alongKm) }));
+    return out;
+  }, [stops, prefs, etaOf]);
+
   const filtered = useMemo(
     () =>
-      stops.filter(
-        (s) =>
-          cats.has(s.category) &&
-          s.detourMin <= maxDetour &&
-          s.visitMin <= maxVisit &&
-          (!aheadOnly || myAlongKm === null || (s.alongKm >= myAlongKm - 2 && s.alongKm <= myAlongKm + 80)),
-      ),
-    [stops, cats, maxDetour, maxVisit, aheadOnly, myAlongKm],
+      stops
+        .filter(
+          (s) =>
+            cats.has(s.category) &&
+            s.detourMin <= maxDetour &&
+            s.visitMin <= maxVisit &&
+            (!gemsOnly || isHiddenGem(s)) &&
+            (!aheadOnly || myAlongKm === null || (s.alongKm >= myAlongKm - 2 && s.alongKm <= myAlongKm + 80)),
+        )
+        // Best match first. Ties keep road order, so a run of equally good stops
+        // still reads as a journey rather than an arbitrary shuffle.
+        .sort((a, b) => {
+          const d = (scoreById.get(b.id)?.score ?? 0) - (scoreById.get(a.id)?.score ?? 0);
+          return d !== 0 ? d : a.alongKm - b.alongKm;
+        }),
+    [stops, cats, maxDetour, maxVisit, gemsOnly, aheadOnly, myAlongKm, scoreById],
   );
+
+  // "Don't Miss These": the strongest handful, spread along the route so they
+  // are not all clustered in the same town.
+  // Renders the Pithop Score line: the number, the Worth It / Maybe / Skip
+  // verdict with the true cost of the stop, and up to three plain-English
+  // reasons. Shared by the results list and the Don't Miss cards so the two can
+  // never disagree about a stop.
+  function ScoreRow({ id }: { id: string }) {
+    const sc = scoreById.get(id);
+    if (!sc) return null;
+    return (
+      <div className="score-row">
+        <span className={`score-badge s${Math.floor(sc.score / 20)}`} title={t('scoreLabel')}>
+          {t('scoreLabel')} {sc.score}
+        </span>
+        <span className={`verdict ${sc.verdict}`}>{t(`verdict_${sc.verdict}` as 'verdict_worth')}</span>
+        <span className="score-extra">{t('totalExtra', { n: fmtDur(sc.totalExtraMin) })}</span>
+      </div>
+    );
+  }
+
+  function ScoreReasons({ id }: { id: string }) {
+    const sc = scoreById.get(id);
+    if (!sc?.reasons.length) return null;
+    return (
+      <ul className="score-why">
+        {sc.reasons.map((r) => (
+          <li key={r.code}>{t(`r_${r.code}` as 'r_hasPhoto', { n: r.value ?? 0 })}</li>
+        ))}
+      </ul>
+    );
+  }
+
+  const dontMiss = useMemo(() => {
+    const out: Stop[] = [];
+    for (const s of filtered) {
+      if (out.length >= 5) break;
+      if ((scoreById.get(s.id)?.score ?? 0) < 60) continue;
+      if (out.some((o) => Math.abs(o.alongKm - s.alongKm) < 15)) continue;
+      out.push(s);
+    }
+    return out;
+  }, [filtered, scoreById]);
 
   const catCounts = useMemo(() => {
     const counts: Partial<Record<CategoryId, number>> = {};
@@ -1047,7 +1133,7 @@ export default function App() {
   // time. Works over the filtered list, so an active vibe gives a themed trip.
   function handleSurprise() {
     if (!spareMin) return;
-    const ids = surprisePlan(filtered, spareMin);
+    const ids = surprisePlan(filtered, spareMin, prefs, { eta: etaOf(0) });
     if (ids.length === 0) {
       setNotice(`🎲 ${t('surpriseNone')}`);
       return;
@@ -1130,14 +1216,20 @@ export default function App() {
   }
 
   // Trip vibes: one-tap category presets. Tapping the active vibe restores all.
-  function applyTheme(th: Theme) {
-    if (activeTheme === th.id) {
-      setActiveTheme(null);
-      setCats(new Set(CATEGORIES.map((c) => c.id)));
-    } else {
-      setActiveTheme(th.id);
-      setCats(new Set(th.cats));
-    }
+  // Toggling a personality re-derives the category filter from whatever is now
+  // selected: the union of their categories, or everything when none are.
+  function togglePersonality(id: PersonalityId) {
+    setPersonalities((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      const union = new Set<CategoryId>();
+      for (const pid of next) {
+        for (const c of PERSONALITIES.find((p) => p.id === pid)?.cats ?? []) union.add(c);
+      }
+      setCats(union.size ? union : new Set(CATEGORIES.map((c) => c.id)));
+      return next;
+    });
   }
 
   // Meal timing: project each food stop's arrival clock time from the route's
@@ -1984,17 +2076,25 @@ export default function App() {
             <div className="filters">
               <div className="vibes" role="group" aria-label={t('vibeLabel')}>
                 <span className="vibes-label">{t('vibeLabel')}</span>
-                {THEMES.map((th) => (
+                {PERSONALITIES.map((p) => (
                   <button
-                    key={th.id}
+                    key={p.id}
                     type="button"
-                    className={`vibe-chip${activeTheme === th.id ? ' active' : ''}`}
-                    aria-pressed={activeTheme === th.id}
-                    onClick={() => applyTheme(th)}
+                    className={`vibe-chip${personalities.has(p.id) ? ' active' : ''}`}
+                    aria-pressed={personalities.has(p.id)}
+                    onClick={() => togglePersonality(p.id)}
                   >
-                    {th.emoji} {t(`theme_${th.id}` as 'theme_weird')}
+                    {p.emoji} {t(`pers_${p.id}` as 'pers_scenic')}
                   </button>
                 ))}
+                <button
+                  type="button"
+                  className={`vibe-chip gem${gemsOnly ? ' active' : ''}`}
+                  aria-pressed={gemsOnly}
+                  onClick={() => setGemsOnly((v) => !v)}
+                >
+                  💎 {t('gemsOnly')}
+                </button>
               </div>
               <div className="chips">
                 {CATEGORIES.map((c) => {
@@ -2077,6 +2177,34 @@ export default function App() {
               </div>
             )}
 
+            {dontMiss.length > 0 && (
+              <div className="dont-miss">
+                <h2>⭐ {t('dontMiss')}</h2>
+                <div className="dm-cards">
+                  {dontMiss.map((s) => {
+                    const c = CATEGORY_MAP[s.category];
+                    return (
+                      <button
+                        key={s.id}
+                        type="button"
+                        className="dm-card"
+                        onClick={() => setSelectedId(s.id)}
+                      >
+                        {s.imageUrl && <img src={s.imageUrl} alt="" loading="lazy" />}
+                        <div className="dm-body">
+                          <div className="dm-name">
+                            {c.emoji} {s.name}
+                          </div>
+                          <ScoreRow id={s.id} />
+                          <ScoreReasons id={s.id} />
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
             <div className="stop-list">
               <div className="list-header">
                 {filtered.length} match{filtered.length === 1 ? '' : 'es'}
@@ -2136,6 +2264,8 @@ export default function App() {
                         {catLabel(s.category)} · ⏱ {fmtDur(s.visitMin)} · 🚗 {s.detourMin} min · at{' '}
                         {distValue(s.alongKm, units)} {units}
                       </div>
+                      <ScoreRow id={s.id} />
+                      {isHiddenGem(s) && <span className="gem-badge">💎 {t('gemBadge')}</span>}
                       {hs && (
                         <span className={`hours-badge ${hs.open ? 'open' : 'closed'}`}>
                           {hs.open ? t('hoursArriveOpen', { t: etaClock }) : `⚠️ ${t('hoursArriveClosed', { t: etaClock })}`}
@@ -2153,6 +2283,7 @@ export default function App() {
                         <div className="stop-details">
                           {s.imageUrl && <img className="stop-photo" src={s.imageUrl} alt={s.name} loading="lazy" />}
                           {intro && intro !== s.description && <p className="stop-intro">{intro}</p>}
+                          <ScoreReasons id={s.id} />
                           <p className="stop-todo">💡 {thingsToDo(s.kind)}</p>
                           {s.hours && <p className="stop-hours">🕐 {prettyHours(s.hours)}</p>}
                           {s.parking && (
