@@ -138,9 +138,11 @@ on one device, exactly as before. Nothing about anonymous use changes.
 1. Run [`supabase/migrations/001_trips.sql`](supabase/migrations/001_trips.sql)
    once in the Supabase dashboard → **SQL Editor → New query**. It creates a
    `trips` table and its Row Level Security policies. The statements are all
-   guarded, so re-running it is safe.
+   guarded, so re-running it is safe. *(Already applied to the `Side-quest`
+   project.)*
 2. That is the whole setup — it reuses the `VITE_SUPABASE_*` values already
-   configured for sign-in.
+   configured for sign-in. The migration must be applied to **the same Supabase
+   project** `VITE_SUPABASE_URL` points at, or sync will silently do nothing.
 
 Row Level Security is the point of doing this in Supabase rather than in a
 plain Postgres box: the **database** enforces that a traveller can only ever
