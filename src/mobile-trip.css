@@ -1,0 +1,239 @@
+/* Mobile trip mode — additive visual layer, no routing or data behavior changes. */
+
+@media (max-width: 768px) {
+  /* Give the map the visual priority of a navigation app. */
+  .map {
+    position: relative;
+    min-height: 58vh;
+    background: var(--bg);
+  }
+
+  .map-canvas,
+  .leaflet-container {
+    min-height: 100%;
+  }
+
+  /* Keep map controls clear of the top HUD and thumb-friendly. */
+  .map .leaflet-top {
+    top: 76px;
+  }
+
+  .map .leaflet-right {
+    right: 10px;
+  }
+
+  .map .leaflet-left {
+    left: 10px;
+  }
+
+  .map .leaflet-bar a,
+  .map .leaflet-touch .leaflet-bar a {
+    width: 44px;
+    height: 44px;
+    line-height: 44px;
+    font-size: 19px;
+  }
+
+  /* Live driving: collapse the sheet into a compact command strip so the
+     route stays visible while navigation is active. */
+  .app:has(.live-hud) .sidebar {
+    height: 23vh;
+    min-height: 150px;
+    max-height: 250px;
+    margin-top: -16px;
+    padding-top: 16px;
+    border-radius: 22px 22px 0 0;
+  }
+
+  .app:has(.live-hud) .sheet-grab {
+    padding-top: 7px;
+    padding-bottom: 2px;
+  }
+
+  .app:has(.live-hud) .brand,
+  .app:has(.live-hud) .search,
+  .app:has(.live-hud) .filters,
+  .app:has(.live-hud) .dont-miss,
+  .app:has(.live-hud) .stop-list,
+  .app:has(.live-hud) .foot {
+    display: none;
+  }
+
+  .app:has(.live-hud) .summary {
+    padding-bottom: 10px;
+  }
+
+  .app:has(.live-hud) .summary-live {
+    display: none;
+  }
+
+  .app:has(.live-hud) .plan {
+    margin: 6px 10px 0;
+    padding: 10px 12px 8px;
+    max-height: 17vh;
+    overflow: auto;
+    border-radius: 16px;
+    box-shadow: var(--shadow-2);
+  }
+
+  .app:has(.live-hud) .plan h2 {
+    margin-bottom: 5px;
+  }
+
+  .app:has(.live-hud) .plan-item {
+    min-height: 38px;
+    padding: 3px 0;
+  }
+
+  .app:has(.live-hud) .plan-item::before {
+    width: 22px;
+    height: 22px;
+    font-size: 10px;
+  }
+
+  .app:has(.live-hud) .plan-cta {
+    margin-top: 6px;
+  }
+
+  .app:has(.live-hud) .plan-nav,
+  .app:has(.live-hud) .plan-share {
+    min-height: 44px;
+  }
+
+  /* The live HUD becomes a proper top navigation card with a larger tap target
+     and stronger hierarchy for the next instruction. */
+  .live-hud {
+    top: max(10px, env(safe-area-inset-top));
+    left: 10px;
+    right: 10px;
+    padding: 13px 13px 12px;
+    border-radius: 18px;
+    gap: 9px;
+    box-shadow: 0 10px 28px rgba(5, 14, 30, 0.38);
+  }
+
+  .live-turn {
+    margin-bottom: 7px;
+    padding-bottom: 7px;
+    font-size: 18px;
+  }
+
+  .live-primary {
+    font-size: 17px;
+  }
+
+  .live-meta {
+    font-size: 14px;
+  }
+
+  .live-secondary {
+    font-size: 12px;
+  }
+
+  .live-actions {
+    gap: 8px;
+  }
+
+  .live-voice,
+  .live-recenter {
+    width: 42px;
+    height: 42px;
+    font-size: 19px;
+  }
+
+  .live-voice {
+    font-size: 16px;
+  }
+
+  .live-end {
+    min-height: 42px;
+    padding: 0 13px;
+    font-size: 12.5px;
+  }
+
+  /* Add-place should never compete with the navigation HUD. */
+  .map-add {
+    right: 12px;
+    bottom: max(42px, calc(env(safe-area-inset-bottom) + 18px));
+    min-height: 46px;
+    padding: 11px 17px;
+  }
+
+  /* Bottom-sheet content: thumb-friendly controls and less wasted chrome. */
+  .plan-nav {
+    min-height: 50px;
+    font-size: 15px;
+  }
+
+  .plan-share {
+    min-height: 50px;
+    font-size: 14px;
+  }
+
+  .plan-cta {
+    position: sticky;
+    bottom: 0;
+    padding-top: 7px;
+    padding-bottom: max(4px, env(safe-area-inset-bottom));
+    background: linear-gradient(180deg, transparent, var(--card) 28%);
+  }
+
+  .stop-card {
+    margin-left: 10px;
+    margin-right: 10px;
+    padding: 11px;
+    border-radius: 16px;
+  }
+
+  .stop-card .add-btn {
+    width: 44px;
+    height: 44px;
+  }
+
+  .list-header {
+    padding-left: 14px;
+    padding-right: 14px;
+  }
+}
+
+@media (max-width: 420px) {
+  .live-hud {
+    left: 8px;
+    right: 8px;
+    padding: 11px 10px;
+  }
+
+  .live-turn {
+    font-size: 16px;
+  }
+
+  .live-primary {
+    font-size: 15px;
+  }
+
+  .live-actions {
+    gap: 6px;
+  }
+
+  .live-voice,
+  .live-recenter {
+    width: 40px;
+    height: 40px;
+  }
+
+  .live-end {
+    min-height: 40px;
+    padding: 0 10px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .live-hud,
+  .app:has(.live-hud) .plan {
+    animation: none;
+  }
+}
+
+:root[data-theme='dark'] .app:has(.live-hud) .plan-cta {
+  background: linear-gradient(180deg, transparent, var(--card) 28%);
+}
