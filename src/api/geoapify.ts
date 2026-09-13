@@ -181,6 +181,44 @@ export async function geoapifyRoutes(
   return routes;
 }
 
+// Somewhere to sleep at the end of a driving day. Queried separately from the
+// roadside search because it is only wanted at a handful of points (one per
+// overnight) rather than along the whole corridor, and because lodging is the
+// one category where a made-up answer would actually strand somebody — so this
+// returns real places or nothing at all.
+export async function fetchGeoapifyLodging(near: LatLng, radiusM = 20000, limit = 8): Promise<Stop[]> {
+  const data = await getJson(
+    `${BASE}/v2/places?categories=accommodation.hotel,accommodation.motel,accommodation.guest_house` +
+      `&filter=circle:${near.lng.toFixed(4)},${near.lat.toFixed(4)},${radiusM}` +
+      `&bias=proximity:${near.lng.toFixed(4)},${near.lat.toFixed(4)}&limit=${limit}&apiKey=${KEY}`,
+  );
+  const out: Stop[] = [];
+  for (const f of data.features ?? []) {
+    const props = f.properties;
+    const lat = props.lat ?? f.geometry?.coordinates?.[1];
+    const lng = props.lon ?? f.geometry?.coordinates?.[0];
+    const name = props.name != null ? String(props.name) : undefined;
+    // An unnamed hotel is not something a traveller can go and find.
+    if (!name || lat == null || lng == null) continue;
+    const raw: Record<string, string> = props.datasource?.raw ?? {};
+    out.push({
+      id: `lodging/${props.place_id ?? `${lat},${lng}`}`,
+      name,
+      lat,
+      lng,
+      category: 'rest',
+      kind: 'hotel',
+      visitMin: 0,
+      source: 'geoapify',
+      website: (props.website ? websiteFromTags({ website: String(props.website) }) : undefined) ?? websiteFromTags(raw),
+      offRouteKm: 0,
+      alongKm: 0,
+      detourMin: 0,
+    });
+  }
+  return out;
+}
+
 // Roadside POIs (replaces Overpass). These are Geoapify's documented category
 // slugs — invalid ones make the whole request 400, so the list is limited to
 // high-confidence categories. The request is tried category-by-category

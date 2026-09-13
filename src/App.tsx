@@ -4,7 +4,7 @@ import { geocode } from './api/geocode';
 import { fetchRoutes, type RouteResult } from './api/route';
 import { fetchRoadsideStops } from './api/overpass';
 import { fetchWikiExtract, fetchWikiStops } from './api/wikipedia';
-import { fetchGeoapifyRoadside, hasGeoapify } from './api/geoapify';
+import { fetchGeoapifyLodging, fetchGeoapifyRoadside, hasGeoapify } from './api/geoapify';
 import {
   fetchCommunityStops,
   hasCommunity,
@@ -17,6 +17,8 @@ import { anyAffiliate, gasCashbackLink, hotelsLink, ticketsLink } from './lib/af
 import { getThemeMode, setThemeMode, type ThemeMode } from './lib/theme';
 import { consumeAuthErrorFromUrl, getUser, hasAuth, signOut, subscribe, type AuthUser } from './lib/auth';
 import { AuthPanel } from './components/AuthPanel';
+import { ItineraryView } from './components/Itinerary';
+import { buildItinerary, defaultDeparture } from './lib/itinerary';
 import { catLabel, getLang, LANGUAGES, setLang, t, type Lang } from './lib/i18n';
 import { getVehicle, setVehicle, VEHICLES, VEHICLE_MAP, type Vehicle } from './lib/vehicle';
 import {
@@ -24,10 +26,17 @@ import {
   buildBingoCard,
   rouletteSpin,
   surprisePlan,
-  THEMES,
   type BingoSquare,
-  type Theme,
 } from './lib/planner';
+import {
+  DEFAULT_PREFS,
+  PERSONALITIES,
+  isHiddenGem,
+  pithopScore,
+  type PersonalityId,
+  type ScoredStop,
+  type TripPrefs,
+} from './lib/score';
 import { hoursStatus, prettyHours } from './lib/hours';
 import {
   clearCurrentTrip,
@@ -35,11 +44,14 @@ import {
   listSavedTrips,
   loadCurrentTrip,
   saveCurrentTrip,
+  mergeRemoteTrips,
   saveTripToLibrary,
+  setRemoteId,
   updateSavedTrip,
   type StoredTrip,
   type TripData,
 } from './lib/tripStore';
+import { deleteRemoteTrip, listRemoteTrips, upsertRemoteTrip } from './lib/tripsDb';
 
 const THEME_LABELS: Record<ThemeMode, { icon: string; label: string }> = {
   auto: { icon: '🌓', label: 'Auto (follows your device)' },
@@ -307,7 +319,22 @@ export default function App() {
   voiceRef.current = voiceOn;
   // Surprise-me spare-time budget (minutes) and the active trip vibe.
   const [spareMin, setSpareMin] = useState<number | null>(null);
-  const [activeTheme, setActiveTheme] = useState<Theme['id'] | null>(null);
+  // Trip personalities are multi-select: they narrow the category filter AND
+  // weight the Pithop Score, so two travellers on the same road see different
+  // stops at the top.
+  const [personalities, setPersonalities] = useState<Set<PersonalityId>>(new Set());
+  const [gemsOnly, setGemsOnly] = useState(false);
+  // Day-by-day view. Departure defaults to tomorrow morning rather than "now",
+  // because a trip being planned is almost never one starting this minute.
+  const [showItinerary, setShowItinerary] = useState(false);
+  const [departAt, setDepartAt] = useState<Date>(() => defaultDeparture());
+  const [maxDriveMin, setMaxDriveMin] = useState(360);
+  const [maxDays, setMaxDays] = useState<number | null>(null);
+  const [dayBreaks, setDayBreaks] = useState<Set<string>>(new Set());
+  // How long the traveller wants at a stop, overriding the estimate the data
+  // came with. Keyed by stop id so it survives re-discovery of the same place.
+  const [visitOverride, setVisitOverride] = useState<Record<string, number>>({});
+  const [lodging, setLodging] = useState<Map<number, Stop[]>>(new Map());
   // Detour Roulette: the stop on the wheel, spin animation, chicken counter.
   const [rouletteStop, setRouletteStop] = useState<Stop | null>(null);
   const [rouletteSpinning, setRouletteSpinning] = useState(false);
@@ -359,6 +386,14 @@ export default function App() {
     setSelectedId(null);
     setAheadOnly(false);
     setMyAlongKm(null);
+    // Restore the schedule the traveller built, or fall back to defaults for a
+    // trip saved before the itinerary existed.
+    const it = t.itinerary;
+    setDepartAt(it ? new Date(it.departAt) : defaultDeparture());
+    setMaxDriveMin(it?.maxDriveMin ?? 360);
+    setMaxDays(it?.maxDays ?? null);
+    setDayBreaks(new Set(it?.dayBreaks ?? []));
+    setVisitOverride(it?.visitOverride ?? {});
   }
 
   // Route geometry is simplified before writing to stay inside storage quotas.
@@ -373,6 +408,13 @@ export default function App() {
           route: { ...route, coords: simplify(route.coords, 1500) },
           stops,
           planIds: [...planIds],
+          itinerary: {
+            departAt: departAt.getTime(),
+            maxDriveMin,
+            maxDays,
+            dayBreaks: [...dayBreaks],
+            visitOverride,
+          },
         }
       : null;
 
@@ -392,6 +434,25 @@ export default function App() {
     void getUser().then(setUser);
     return subscribe(setUser);
   }, []);
+
+  // Once somebody is signed in, fold their server-side trips into the local
+  // library. localStorage stays what the app reads from; this only widens it,
+  // so a signed-out session and an offline one behave exactly as before.
+  useEffect(() => {
+    if (!user) return;
+    let cancelled = false;
+    void listRemoteTrips()
+      .then((remote) => {
+        if (cancelled || remote.length === 0) return;
+        setSavedTrips(mergeRemoteTrips(remote));
+      })
+      .catch(() => {
+        // Offline or the table isn't created yet — local trips still work.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [user]);
 
   // On startup: an opened share link wins over the auto-saved trip. It carries
   // the endpoints and planned stops; we re-run the search to rebuild the route
@@ -461,8 +522,18 @@ export default function App() {
     const err = saveTripToLibrary(t);
     const list = listSavedTrips();
     setSavedTrips(list);
-    if (!err) activeLibraryIdRef.current = list.find((s) => s.routeLabel === t.routeLabel)?.id ?? null;
+    const entry = list.find((s) => s.routeLabel === t.routeLabel);
+    if (!err) activeLibraryIdRef.current = entry?.id ?? null;
     setNotice(err ?? '💾 Trip saved — it keeps updating as you edit, and you can reopen it from the start screen.');
+    // Mirror it to the account, when there is one. Failure is not surfaced:
+    // the trip is already saved locally, which is what the traveller asked for.
+    if (!err && entry) {
+      void upsertRemoteTrip(t, entry.remoteId)
+        .then((remoteId) => {
+          if (remoteId) setRemoteId(entry.id, remoteId);
+        })
+        .catch(() => {});
+    }
   }
 
   function handleLoadTrip(t: StoredTrip) {
@@ -481,6 +552,8 @@ export default function App() {
     if (!window.confirm(`Delete saved trip "${t.routeLabel}"?`)) return;
     if (activeLibraryIdRef.current === t.id) activeLibraryIdRef.current = null;
     setSavedTrips(deleteSavedTrip(t.id));
+    // Otherwise the next sign-in on this device would pull it straight back.
+    if (t.remoteId) void deleteRemoteTrip(t.remoteId).catch(() => {});
   }
 
   // How far along the active route a coordinate sits, for ordering things by
@@ -821,6 +894,10 @@ export default function App() {
     setToPick(null);
     setVias([]);
     setRouteVias([]);
+    setShowItinerary(false);
+    setDayBreaks(new Set());
+    setVisitOverride({});
+    setDepartAt(defaultDeparture());
     endLive();
     setRouletteStop(null);
     setRespins(0);
@@ -882,7 +959,9 @@ export default function App() {
   }
 
   function toggleCat(id: CategoryId) {
-    setActiveTheme(null); // manual chip edits leave any one-tap vibe preset
+    // Hand-editing the category chips means the traveller is steering directly,
+    // so any personality preset stops claiming to describe the filter.
+    setPersonalities(new Set());
     setCats((prev) => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id);
@@ -900,17 +979,90 @@ export default function App() {
     });
   }
 
+  // The traveller's preferences, in the shape the scorer wants. Kept as one
+  // memo so every consumer (list, Don't Miss, Surprise Me) scores identically.
+  const prefs = useMemo<TripPrefs>(
+    () => ({ ...DEFAULT_PREFS, personalities: [...personalities], maxDetourMin: maxDetour }),
+    [personalities, maxDetour],
+  );
+
+  // Average speed of the chosen route, used to project an arrival clock time
+  // for each stop so opening hours are judged at arrival rather than "now".
+  const avgKmh = route && route.durationMin > 0 ? route.distanceKm / (route.durationMin / 60) : 70;
+  const etaOf = useCallback(
+    (alongKm: number) => new Date(Date.now() + (alongKm / avgKmh) * 3600_000),
+    [avgKmh],
+  );
+
+  // Pithop Score for every stop. Deterministic, so this is pure derived state.
+  const scoreById = useMemo(() => {
+    const out = new Map<string, ScoredStop>();
+    for (const s of stops) out.set(s.id, pithopScore(s, prefs, { eta: etaOf(s.alongKm) }));
+    return out;
+  }, [stops, prefs, etaOf]);
+
   const filtered = useMemo(
     () =>
-      stops.filter(
-        (s) =>
-          cats.has(s.category) &&
-          s.detourMin <= maxDetour &&
-          s.visitMin <= maxVisit &&
-          (!aheadOnly || myAlongKm === null || (s.alongKm >= myAlongKm - 2 && s.alongKm <= myAlongKm + 80)),
-      ),
-    [stops, cats, maxDetour, maxVisit, aheadOnly, myAlongKm],
+      stops
+        .filter(
+          (s) =>
+            cats.has(s.category) &&
+            s.detourMin <= maxDetour &&
+            s.visitMin <= maxVisit &&
+            (!gemsOnly || isHiddenGem(s)) &&
+            (!aheadOnly || myAlongKm === null || (s.alongKm >= myAlongKm - 2 && s.alongKm <= myAlongKm + 80)),
+        )
+        // Best match first. Ties keep road order, so a run of equally good stops
+        // still reads as a journey rather than an arbitrary shuffle.
+        .sort((a, b) => {
+          const d = (scoreById.get(b.id)?.score ?? 0) - (scoreById.get(a.id)?.score ?? 0);
+          return d !== 0 ? d : a.alongKm - b.alongKm;
+        }),
+    [stops, cats, maxDetour, maxVisit, gemsOnly, aheadOnly, myAlongKm, scoreById],
   );
+
+  // "Don't Miss These": the strongest handful, spread along the route so they
+  // are not all clustered in the same town.
+  // Renders the Pithop Score line: the number, the Worth It / Maybe / Skip
+  // verdict with the true cost of the stop, and up to three plain-English
+  // reasons. Shared by the results list and the Don't Miss cards so the two can
+  // never disagree about a stop.
+  function ScoreRow({ id }: { id: string }) {
+    const sc = scoreById.get(id);
+    if (!sc) return null;
+    return (
+      <div className="score-row">
+        <span className={`score-badge s${Math.floor(sc.score / 20)}`} title={t('scoreLabel')}>
+          {t('scoreLabel')} {sc.score}
+        </span>
+        <span className={`verdict ${sc.verdict}`}>{t(`verdict_${sc.verdict}` as 'verdict_worth')}</span>
+        <span className="score-extra">{t('totalExtra', { n: fmtDur(sc.totalExtraMin) })}</span>
+      </div>
+    );
+  }
+
+  function ScoreReasons({ id }: { id: string }) {
+    const sc = scoreById.get(id);
+    if (!sc?.reasons.length) return null;
+    return (
+      <ul className="score-why">
+        {sc.reasons.map((r) => (
+          <li key={r.code}>{t(`r_${r.code}` as 'r_hasPhoto', { n: r.value ?? 0 })}</li>
+        ))}
+      </ul>
+    );
+  }
+
+  const dontMiss = useMemo(() => {
+    const out: Stop[] = [];
+    for (const s of filtered) {
+      if (out.length >= 5) break;
+      if ((scoreById.get(s.id)?.score ?? 0) < 60) continue;
+      if (out.some((o) => Math.abs(o.alongKm - s.alongKm) < 15)) continue;
+      out.push(s);
+    }
+    return out;
+  }, [filtered, scoreById]);
 
   const catCounts = useMemo(() => {
     const counts: Partial<Record<CategoryId, number>> = {};
@@ -924,6 +1076,70 @@ export default function App() {
 
   const plan = useMemo(() => stops.filter((s) => planIds.has(s.id)), [stops, planIds]);
   const planExtraMin = plan.reduce((sum, s) => sum + s.visitMin + s.detourMin, 0);
+
+  // The plan as the scheduler wants it: road order, with any visit-length the
+  // traveller has chosen applied over the data's own estimate.
+  const planForSchedule = useMemo(
+    () =>
+      plan
+        .map((s) => (visitOverride[s.id] != null ? { ...s, visitMin: visitOverride[s.id] } : s))
+        .sort((a, b) => a.alongKm - b.alongKm),
+    [plan, visitOverride],
+  );
+
+  const itinerary = useMemo(() => {
+    if (!route) return null;
+    return buildItinerary(planForSchedule, {
+      departAt,
+      dailyDepartMin: departAt.getHours() * 60 + departAt.getMinutes(),
+      maxDriveMinPerDay: maxDriveMin,
+      totalDistanceKm: route.distanceKm,
+      totalDurationMin: route.durationMin,
+      dayBreaksAfter: dayBreaks,
+      maxDays: maxDays ?? undefined,
+    });
+  }, [route, planForSchedule, departAt, maxDriveMin, dayBreaks, maxDays]);
+
+  // Somewhere to sleep at each overnight point. Only fetched for days that
+  // actually end away from home, and only with a commercial key — the free
+  // stack has no lodging source, and inventing hotels would strand someone.
+  useEffect(() => {
+    if (!itinerary || !hasGeoapify()) return;
+    const overnights = itinerary.days.filter((d) => !d.isFinal);
+    if (overnights.length === 0) {
+      setLodging(new Map());
+      return;
+    }
+    let cancelled = false;
+    void Promise.all(
+      overnights.map(async (d) => {
+        const last = d.stops[d.stops.length - 1]?.stop;
+        if (!last) return [d.index, [] as Stop[]] as const;
+        try {
+          return [d.index, await fetchGeoapifyLodging({ lat: last.lat, lng: last.lng })] as const;
+        } catch {
+          return [d.index, [] as Stop[]] as const;
+        }
+      }),
+    ).then((pairs) => {
+      if (!cancelled) setLodging(new Map(pairs));
+    });
+    return () => {
+      cancelled = true;
+    };
+    // Only the overnight anchors matter, not every re-render of the schedule.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [itinerary?.days.map((d) => (d.isFinal ? '' : d.stops[d.stops.length - 1]?.stop.id)).join('|')]);
+
+  function toggleDayBreak(id: string) {
+    setDayBreaks((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
 
   // --- Virtualised results list ---------------------------------------------
   // The list can run to LIST_CAP cards; rendering them all is what made
@@ -1047,7 +1263,7 @@ export default function App() {
   // time. Works over the filtered list, so an active vibe gives a themed trip.
   function handleSurprise() {
     if (!spareMin) return;
-    const ids = surprisePlan(filtered, spareMin);
+    const ids = surprisePlan(filtered, spareMin, prefs, { eta: etaOf(0) });
     if (ids.length === 0) {
       setNotice(`🎲 ${t('surpriseNone')}`);
       return;
@@ -1130,14 +1346,20 @@ export default function App() {
   }
 
   // Trip vibes: one-tap category presets. Tapping the active vibe restores all.
-  function applyTheme(th: Theme) {
-    if (activeTheme === th.id) {
-      setActiveTheme(null);
-      setCats(new Set(CATEGORIES.map((c) => c.id)));
-    } else {
-      setActiveTheme(th.id);
-      setCats(new Set(th.cats));
-    }
+  // Toggling a personality re-derives the category filter from whatever is now
+  // selected: the union of their categories, or everything when none are.
+  function togglePersonality(id: PersonalityId) {
+    setPersonalities((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      const union = new Set<CategoryId>();
+      for (const pid of next) {
+        for (const c of PERSONALITIES.find((p) => p.id === pid)?.cats ?? []) union.add(c);
+      }
+      setCats(union.size ? union : new Set(CATEGORIES.map((c) => c.id)));
+      return next;
+    });
   }
 
   // Meal timing: project each food stop's arrival clock time from the route's
@@ -1984,17 +2206,25 @@ export default function App() {
             <div className="filters">
               <div className="vibes" role="group" aria-label={t('vibeLabel')}>
                 <span className="vibes-label">{t('vibeLabel')}</span>
-                {THEMES.map((th) => (
+                {PERSONALITIES.map((p) => (
                   <button
-                    key={th.id}
+                    key={p.id}
                     type="button"
-                    className={`vibe-chip${activeTheme === th.id ? ' active' : ''}`}
-                    aria-pressed={activeTheme === th.id}
-                    onClick={() => applyTheme(th)}
+                    className={`vibe-chip${personalities.has(p.id) ? ' active' : ''}`}
+                    aria-pressed={personalities.has(p.id)}
+                    onClick={() => togglePersonality(p.id)}
                   >
-                    {th.emoji} {t(`theme_${th.id}` as 'theme_weird')}
+                    {p.emoji} {t(`pers_${p.id}` as 'pers_scenic')}
                   </button>
                 ))}
+                <button
+                  type="button"
+                  className={`vibe-chip gem${gemsOnly ? ' active' : ''}`}
+                  aria-pressed={gemsOnly}
+                  onClick={() => setGemsOnly((v) => !v)}
+                >
+                  💎 {t('gemsOnly')}
+                </button>
               </div>
               <div className="chips">
                 {CATEGORIES.map((c) => {
@@ -2077,6 +2307,79 @@ export default function App() {
               </div>
             )}
 
+            {plan.length > 0 && (
+              <div className="view-tabs" role="tablist" aria-label={t('itineraryTab')}>
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={!showItinerary}
+                  className={`view-tab${!showItinerary ? ' active' : ''}`}
+                  onClick={() => setShowItinerary(false)}
+                >
+                  📍 {t('listTab')}
+                </button>
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={showItinerary}
+                  className={`view-tab${showItinerary ? ' active' : ''}`}
+                  onClick={() => setShowItinerary(true)}
+                >
+                  🗓 {t('itineraryTab')}
+                </button>
+              </div>
+            )}
+
+            {showItinerary && itinerary && plan.length > 0 ? (
+              <ItineraryView
+                itinerary={itinerary}
+                units={units}
+                departAt={departAt}
+                maxDriveMin={maxDriveMin}
+                maxDays={maxDays}
+                dayBreaks={dayBreaks}
+                lodging={lodging}
+                onDepartChange={setDepartAt}
+                onMaxDriveChange={setMaxDriveMin}
+                onMaxDaysChange={setMaxDays}
+                onToggleDayBreak={toggleDayBreak}
+                onVisitChange={(id, min) => setVisitOverride((v) => ({ ...v, [id]: min }))}
+                onRemove={(id) => togglePlan(id)}
+                onSelect={(id) => {
+                  setShowItinerary(false);
+                  setSelectedId(id);
+                }}
+              />
+            ) : (
+            <>
+            {dontMiss.length > 0 && (
+              <div className="dont-miss">
+                <h2>⭐ {t('dontMiss')}</h2>
+                <div className="dm-cards">
+                  {dontMiss.map((s) => {
+                    const c = CATEGORY_MAP[s.category];
+                    return (
+                      <button
+                        key={s.id}
+                        type="button"
+                        className="dm-card"
+                        onClick={() => setSelectedId(s.id)}
+                      >
+                        {s.imageUrl && <img src={s.imageUrl} alt="" loading="lazy" />}
+                        <div className="dm-body">
+                          <div className="dm-name">
+                            {c.emoji} {s.name}
+                          </div>
+                          <ScoreRow id={s.id} />
+                          <ScoreReasons id={s.id} />
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
             <div className="stop-list">
               <div className="list-header">
                 {filtered.length} match{filtered.length === 1 ? '' : 'es'}
@@ -2136,6 +2439,8 @@ export default function App() {
                         {catLabel(s.category)} · ⏱ {fmtDur(s.visitMin)} · 🚗 {s.detourMin} min · at{' '}
                         {distValue(s.alongKm, units)} {units}
                       </div>
+                      <ScoreRow id={s.id} />
+                      {isHiddenGem(s) && <span className="gem-badge">💎 {t('gemBadge')}</span>}
                       {hs && (
                         <span className={`hours-badge ${hs.open ? 'open' : 'closed'}`}>
                           {hs.open ? t('hoursArriveOpen', { t: etaClock }) : `⚠️ ${t('hoursArriveClosed', { t: etaClock })}`}
@@ -2153,6 +2458,7 @@ export default function App() {
                         <div className="stop-details">
                           {s.imageUrl && <img className="stop-photo" src={s.imageUrl} alt={s.name} loading="lazy" />}
                           {intro && intro !== s.description && <p className="stop-intro">{intro}</p>}
+                          <ScoreReasons id={s.id} />
                           <p className="stop-todo">💡 {thingsToDo(s.kind)}</p>
                           {s.hours && <p className="stop-hours">🕐 {prettyHours(s.hours)}</p>}
                           {s.parking && (
@@ -2217,6 +2523,8 @@ export default function App() {
               })}
               </div>
             </div>
+            </>
+            )}
           </>
         )}
 
