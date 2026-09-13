@@ -4,6 +4,7 @@ import { Analytics } from '@vercel/analytics/react';
 import 'leaflet/dist/leaflet.css';
 import './styles.css';
 import './polish.css';
+import './trip-polish.css';
 import App from './App';
 import { initTheme } from './lib/theme';
 import { initI18n } from './lib/i18n';
