@@ -1,0 +1,142 @@
+/* Pithop visual polish layer — additive, no component markup changes. */
+
+.sidebar {
+  border-right: 1px solid rgba(211, 220, 233, 0.8);
+}
+
+.hero {
+  isolation: isolate;
+  overflow: hidden;
+}
+
+.hero::before {
+  content: '';
+  position: absolute;
+  width: 280px;
+  height: 280px;
+  right: -110px;
+  top: -150px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.1);
+  pointer-events: none;
+}
+
+.brand,
+.search {
+  position: relative;
+  z-index: 1;
+}
+
+button,
+select,
+input {
+  transition:
+    transform 140ms var(--ease-out),
+    box-shadow 180ms var(--ease-out),
+    border-color 180ms var(--ease-out),
+    background-color 180ms var(--ease-out);
+}
+
+button:not(:disabled):hover {
+  transform: translateY(-1px);
+}
+
+button:not(:disabled):active {
+  transform: translateY(0) scale(0.98);
+}
+
+.search input {
+  min-height: 46px;
+}
+
+.search input:focus {
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.42), 0 8px 24px rgba(13, 25, 48, 0.2);
+}
+
+.go-btn {
+  box-shadow: 0 8px 20px rgba(15, 59, 130, 0.18);
+}
+
+.go-btn:not(:disabled):hover {
+  box-shadow: 0 10px 24px rgba(15, 59, 130, 0.24);
+}
+
+.stop-card,
+.result-card,
+.stop,
+.place-card {
+  transition:
+    transform 180ms var(--ease-out),
+    box-shadow 180ms var(--ease-out),
+    border-color 180ms var(--ease-out);
+}
+
+.stop-card:hover,
+.result-card:hover,
+.stop:hover,
+.place-card:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-2);
+}
+
+[role='button']:focus-visible,
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible {
+  outline: 3px solid rgba(37, 99, 235, 0.45);
+  outline-offset: 2px;
+}
+
+.leaflet-control-zoom,
+.leaflet-control-layers,
+.leaflet-bar {
+  box-shadow: 0 4px 14px rgba(16, 29, 51, 0.14) !important;
+}
+
+.leaflet-control-zoom a,
+.leaflet-control-layers {
+  border-color: rgba(211, 220, 233, 0.9) !important;
+}
+
+@media (max-width: 760px) {
+  .sidebar {
+    border-right: 0;
+  }
+
+  .brand {
+    padding-top: 16px;
+  }
+
+  .map {
+    background: var(--bg);
+  }
+
+  .leaflet-control-zoom {
+    margin-top: 12px !important;
+  }
+
+  .suggestions {
+    max-height: min(42vh, 300px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+:root[data-theme='dark'] .sidebar {
+  border-right-color: rgba(70, 88, 111, 0.35);
+}
+
+:root[data-theme='dark'] .leaflet-control-zoom a,
+:root[data-theme='dark'] .leaflet-control-layers {
+  border-color: rgba(70, 88, 111, 0.55) !important;
+}
