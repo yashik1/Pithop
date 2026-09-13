@@ -22,7 +22,10 @@ export function hasAuth(): boolean {
 }
 
 let clientPromise: Promise<SupabaseClient> | null = null;
-function getClient(): Promise<SupabaseClient> {
+// Exported so other modules (trip sync) share this one client, and with it the
+// signed-in session and its token refresh. A second client would hold its own
+// session and drift out of step with this one.
+export function getClient(): Promise<SupabaseClient> {
   if (!clientPromise) {
     clientPromise = import('@supabase/supabase-js').then(({ createClient }) =>
       createClient(URL, ANON, {

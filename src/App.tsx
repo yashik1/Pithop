@@ -42,11 +42,14 @@ import {
   listSavedTrips,
   loadCurrentTrip,
   saveCurrentTrip,
+  mergeRemoteTrips,
   saveTripToLibrary,
+  setRemoteId,
   updateSavedTrip,
   type StoredTrip,
   type TripData,
 } from './lib/tripStore';
+import { deleteRemoteTrip, listRemoteTrips, upsertRemoteTrip } from './lib/tripsDb';
 
 const THEME_LABELS: Record<ThemeMode, { icon: string; label: string }> = {
   auto: { icon: '🌓', label: 'Auto (follows your device)' },
@@ -404,6 +407,25 @@ export default function App() {
     return subscribe(setUser);
   }, []);
 
+  // Once somebody is signed in, fold their server-side trips into the local
+  // library. localStorage stays what the app reads from; this only widens it,
+  // so a signed-out session and an offline one behave exactly as before.
+  useEffect(() => {
+    if (!user) return;
+    let cancelled = false;
+    void listRemoteTrips()
+      .then((remote) => {
+        if (cancelled || remote.length === 0) return;
+        setSavedTrips(mergeRemoteTrips(remote));
+      })
+      .catch(() => {
+        // Offline or the table isn't created yet — local trips still work.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [user]);
+
   // On startup: an opened share link wins over the auto-saved trip. It carries
   // the endpoints and planned stops; we re-run the search to rebuild the route
   // and full results, then re-apply the shared plan (see the effect below).
@@ -472,8 +494,18 @@ export default function App() {
     const err = saveTripToLibrary(t);
     const list = listSavedTrips();
     setSavedTrips(list);
-    if (!err) activeLibraryIdRef.current = list.find((s) => s.routeLabel === t.routeLabel)?.id ?? null;
+    const entry = list.find((s) => s.routeLabel === t.routeLabel);
+    if (!err) activeLibraryIdRef.current = entry?.id ?? null;
     setNotice(err ?? '💾 Trip saved — it keeps updating as you edit, and you can reopen it from the start screen.');
+    // Mirror it to the account, when there is one. Failure is not surfaced:
+    // the trip is already saved locally, which is what the traveller asked for.
+    if (!err && entry) {
+      void upsertRemoteTrip(t, entry.remoteId)
+        .then((remoteId) => {
+          if (remoteId) setRemoteId(entry.id, remoteId);
+        })
+        .catch(() => {});
+    }
   }
 
   function handleLoadTrip(t: StoredTrip) {
@@ -492,6 +524,8 @@ export default function App() {
     if (!window.confirm(`Delete saved trip "${t.routeLabel}"?`)) return;
     if (activeLibraryIdRef.current === t.id) activeLibraryIdRef.current = null;
     setSavedTrips(deleteSavedTrip(t.id));
+    // Otherwise the next sign-in on this device would pull it straight back.
+    if (t.remoteId) void deleteRemoteTrip(t.remoteId).catch(() => {});
   }
 
   // How far along the active route a coordinate sits, for ordering things by

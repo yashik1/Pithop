@@ -24,6 +24,9 @@ export interface TripData {
 export interface StoredTrip extends TripData {
   id: string;
   savedAt: number;
+  /** Server id once this trip has been mirrored to Postgres. Absent while it
+   *  has only ever existed on this device, or when nobody is signed in. */
+  remoteId?: string;
 }
 
 // Legacy key names kept on purpose after the rebrand to Pithop — renaming
@@ -113,4 +116,57 @@ export function deleteSavedTrip(id: string): StoredTrip[] {
   const list = listSavedTrips().filter((t) => t.id !== id);
   writeLibrary(list);
   return list;
+}
+
+
+// ---------------------------------------------------------------------------
+// Cross-device sync
+//
+// localStorage stays the source of truth the app reads from — that is what
+// keeps a trip openable on a plane. These helpers fold the server's copy into
+// it after sign-in, and hand back what should be pushed the other way.
+// ---------------------------------------------------------------------------
+
+/**
+ * Merge trips pulled from the server into the local library. Trips are matched
+ * on route label, which is what the local library already upserts by, and the
+ * newer of the two wins. Returns the merged library.
+ */
+export function mergeRemoteTrips(remote: Array<StoredTrip | (TripData & { remoteId: string; savedAt: number })>): StoredTrip[] {
+  const local = listSavedTrips();
+  const byLabel = new Map<string, StoredTrip>();
+  for (const t of local) byLabel.set(t.routeLabel, t);
+
+  for (const r of remote) {
+    if (!isTrip(r)) continue;
+    const existing = byLabel.get(r.routeLabel);
+    if (!existing) {
+      byLabel.set(r.routeLabel, {
+        ...(r as TripData),
+        id: `${r.savedAt}-${Math.random().toString(36).slice(2, 8)}`,
+        savedAt: r.savedAt,
+        remoteId: r.remoteId,
+      });
+    } else if (r.savedAt > existing.savedAt) {
+      // Server copy is newer: take its content but keep the local id so any
+      // open trip pointing at it stays pointing at it.
+      byLabel.set(r.routeLabel, { ...existing, ...(r as TripData), savedAt: r.savedAt, remoteId: r.remoteId });
+    } else {
+      // Local copy is newer or equal — just remember where it lives remotely.
+      byLabel.set(r.routeLabel, { ...existing, remoteId: r.remoteId ?? existing.remoteId });
+    }
+  }
+
+  const merged = [...byLabel.values()].sort((a, b) => b.savedAt - a.savedAt).slice(0, TRIP_LIMIT);
+  writeLibrary(merged);
+  return merged;
+}
+
+/** Record the server id for a locally saved trip, after a successful push. */
+export function setRemoteId(id: string, remoteId: string): void {
+  const list = listSavedTrips();
+  const i = list.findIndex((t) => t.id === id);
+  if (i < 0) return;
+  list[i] = { ...list[i], remoteId };
+  writeLibrary(list);
 }

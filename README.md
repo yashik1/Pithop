@@ -129,6 +129,28 @@ Submissions are then credited to the contributor's first name + last initial
 ("Added by Jane D."). Without these env vars, adding stays anonymous (only the
 IP rate limit applies), so dev and forks keep working.
 
+## Saved trips across devices (optional)
+
+Signed-in travellers can have their saved trips follow them between devices.
+Without this, trips still save — they just stay in the browser's local storage
+on one device, exactly as before. Nothing about anonymous use changes.
+
+1. Run [`supabase/migrations/001_trips.sql`](supabase/migrations/001_trips.sql)
+   once in the Supabase dashboard → **SQL Editor → New query**. It creates a
+   `trips` table and its Row Level Security policies. The statements are all
+   guarded, so re-running it is safe.
+2. That is the whole setup — it reuses the `VITE_SUPABASE_*` values already
+   configured for sign-in.
+
+Row Level Security is the point of doing this in Supabase rather than in a
+plain Postgres box: the **database** enforces that a traveller can only ever
+read their own trips, so a mistake in application code cannot leak somebody
+else's data.
+
+Local storage stays the source of truth the app reads from — that is what keeps
+a trip openable offline — and the server copy is a mirror that is folded in on
+sign-in, newest version winning.
+
 ## Affiliate links (optional)
 
 Monetization is env-driven and off by default — each button appears only when
