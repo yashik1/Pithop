@@ -4,7 +4,7 @@ import { geocode } from './api/geocode';
 import { fetchRoutes, type RouteResult } from './api/route';
 import { fetchRoadsideStops } from './api/overpass';
 import { fetchWikiExtract, fetchWikiStops } from './api/wikipedia';
-import { fetchGeoapifyRoadside, hasGeoapify } from './api/geoapify';
+import { fetchGeoapifyLodging, fetchGeoapifyRoadside, hasGeoapify } from './api/geoapify';
 import {
   fetchCommunityStops,
   hasCommunity,
@@ -17,6 +17,8 @@ import { anyAffiliate, gasCashbackLink, hotelsLink, ticketsLink } from './lib/af
 import { getThemeMode, setThemeMode, type ThemeMode } from './lib/theme';
 import { consumeAuthErrorFromUrl, getUser, hasAuth, signOut, subscribe, type AuthUser } from './lib/auth';
 import { AuthPanel } from './components/AuthPanel';
+import { ItineraryView } from './components/Itinerary';
+import { buildItinerary, defaultDeparture } from './lib/itinerary';
 import { catLabel, getLang, LANGUAGES, setLang, t, type Lang } from './lib/i18n';
 import { getVehicle, setVehicle, VEHICLES, VEHICLE_MAP, type Vehicle } from './lib/vehicle';
 import {
@@ -322,6 +324,17 @@ export default function App() {
   // stops at the top.
   const [personalities, setPersonalities] = useState<Set<PersonalityId>>(new Set());
   const [gemsOnly, setGemsOnly] = useState(false);
+  // Day-by-day view. Departure defaults to tomorrow morning rather than "now",
+  // because a trip being planned is almost never one starting this minute.
+  const [showItinerary, setShowItinerary] = useState(false);
+  const [departAt, setDepartAt] = useState<Date>(() => defaultDeparture());
+  const [maxDriveMin, setMaxDriveMin] = useState(360);
+  const [maxDays, setMaxDays] = useState<number | null>(null);
+  const [dayBreaks, setDayBreaks] = useState<Set<string>>(new Set());
+  // How long the traveller wants at a stop, overriding the estimate the data
+  // came with. Keyed by stop id so it survives re-discovery of the same place.
+  const [visitOverride, setVisitOverride] = useState<Record<string, number>>({});
+  const [lodging, setLodging] = useState<Map<number, Stop[]>>(new Map());
   // Detour Roulette: the stop on the wheel, spin animation, chicken counter.
   const [rouletteStop, setRouletteStop] = useState<Stop | null>(null);
   const [rouletteSpinning, setRouletteSpinning] = useState(false);
@@ -373,6 +386,14 @@ export default function App() {
     setSelectedId(null);
     setAheadOnly(false);
     setMyAlongKm(null);
+    // Restore the schedule the traveller built, or fall back to defaults for a
+    // trip saved before the itinerary existed.
+    const it = t.itinerary;
+    setDepartAt(it ? new Date(it.departAt) : defaultDeparture());
+    setMaxDriveMin(it?.maxDriveMin ?? 360);
+    setMaxDays(it?.maxDays ?? null);
+    setDayBreaks(new Set(it?.dayBreaks ?? []));
+    setVisitOverride(it?.visitOverride ?? {});
   }
 
   // Route geometry is simplified before writing to stay inside storage quotas.
@@ -387,6 +408,13 @@ export default function App() {
           route: { ...route, coords: simplify(route.coords, 1500) },
           stops,
           planIds: [...planIds],
+          itinerary: {
+            departAt: departAt.getTime(),
+            maxDriveMin,
+            maxDays,
+            dayBreaks: [...dayBreaks],
+            visitOverride,
+          },
         }
       : null;
 
@@ -866,6 +894,10 @@ export default function App() {
     setToPick(null);
     setVias([]);
     setRouteVias([]);
+    setShowItinerary(false);
+    setDayBreaks(new Set());
+    setVisitOverride({});
+    setDepartAt(defaultDeparture());
     endLive();
     setRouletteStop(null);
     setRespins(0);
@@ -1044,6 +1076,70 @@ export default function App() {
 
   const plan = useMemo(() => stops.filter((s) => planIds.has(s.id)), [stops, planIds]);
   const planExtraMin = plan.reduce((sum, s) => sum + s.visitMin + s.detourMin, 0);
+
+  // The plan as the scheduler wants it: road order, with any visit-length the
+  // traveller has chosen applied over the data's own estimate.
+  const planForSchedule = useMemo(
+    () =>
+      plan
+        .map((s) => (visitOverride[s.id] != null ? { ...s, visitMin: visitOverride[s.id] } : s))
+        .sort((a, b) => a.alongKm - b.alongKm),
+    [plan, visitOverride],
+  );
+
+  const itinerary = useMemo(() => {
+    if (!route) return null;
+    return buildItinerary(planForSchedule, {
+      departAt,
+      dailyDepartMin: departAt.getHours() * 60 + departAt.getMinutes(),
+      maxDriveMinPerDay: maxDriveMin,
+      totalDistanceKm: route.distanceKm,
+      totalDurationMin: route.durationMin,
+      dayBreaksAfter: dayBreaks,
+      maxDays: maxDays ?? undefined,
+    });
+  }, [route, planForSchedule, departAt, maxDriveMin, dayBreaks, maxDays]);
+
+  // Somewhere to sleep at each overnight point. Only fetched for days that
+  // actually end away from home, and only with a commercial key — the free
+  // stack has no lodging source, and inventing hotels would strand someone.
+  useEffect(() => {
+    if (!itinerary || !hasGeoapify()) return;
+    const overnights = itinerary.days.filter((d) => !d.isFinal);
+    if (overnights.length === 0) {
+      setLodging(new Map());
+      return;
+    }
+    let cancelled = false;
+    void Promise.all(
+      overnights.map(async (d) => {
+        const last = d.stops[d.stops.length - 1]?.stop;
+        if (!last) return [d.index, [] as Stop[]] as const;
+        try {
+          return [d.index, await fetchGeoapifyLodging({ lat: last.lat, lng: last.lng })] as const;
+        } catch {
+          return [d.index, [] as Stop[]] as const;
+        }
+      }),
+    ).then((pairs) => {
+      if (!cancelled) setLodging(new Map(pairs));
+    });
+    return () => {
+      cancelled = true;
+    };
+    // Only the overnight anchors matter, not every re-render of the schedule.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [itinerary?.days.map((d) => (d.isFinal ? '' : d.stops[d.stops.length - 1]?.stop.id)).join('|')]);
+
+  function toggleDayBreak(id: string) {
+    setDayBreaks((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
 
   // --- Virtualised results list ---------------------------------------------
   // The list can run to LIST_CAP cards; rendering them all is what made
@@ -2211,6 +2307,51 @@ export default function App() {
               </div>
             )}
 
+            {plan.length > 0 && (
+              <div className="view-tabs" role="tablist" aria-label={t('itineraryTab')}>
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={!showItinerary}
+                  className={`view-tab${!showItinerary ? ' active' : ''}`}
+                  onClick={() => setShowItinerary(false)}
+                >
+                  📍 {t('listTab')}
+                </button>
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={showItinerary}
+                  className={`view-tab${showItinerary ? ' active' : ''}`}
+                  onClick={() => setShowItinerary(true)}
+                >
+                  🗓 {t('itineraryTab')}
+                </button>
+              </div>
+            )}
+
+            {showItinerary && itinerary && plan.length > 0 ? (
+              <ItineraryView
+                itinerary={itinerary}
+                units={units}
+                departAt={departAt}
+                maxDriveMin={maxDriveMin}
+                maxDays={maxDays}
+                dayBreaks={dayBreaks}
+                lodging={lodging}
+                onDepartChange={setDepartAt}
+                onMaxDriveChange={setMaxDriveMin}
+                onMaxDaysChange={setMaxDays}
+                onToggleDayBreak={toggleDayBreak}
+                onVisitChange={(id, min) => setVisitOverride((v) => ({ ...v, [id]: min }))}
+                onRemove={(id) => togglePlan(id)}
+                onSelect={(id) => {
+                  setShowItinerary(false);
+                  setSelectedId(id);
+                }}
+              />
+            ) : (
+            <>
             {dontMiss.length > 0 && (
               <div className="dont-miss">
                 <h2>⭐ {t('dontMiss')}</h2>
@@ -2382,6 +2523,8 @@ export default function App() {
               })}
               </div>
             </div>
+            </>
+            )}
           </>
         )}
 

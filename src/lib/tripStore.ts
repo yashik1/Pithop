@@ -19,6 +19,16 @@ export interface TripData {
   route: RouteResult;
   stops: Stop[];
   planIds: string[];
+  /** Day-by-day settings and edits. Optional: trips saved before the itinerary
+   *  existed have none, and simply fall back to the defaults. */
+  itinerary?: {
+    /** Epoch ms — Date does not survive JSON. */
+    departAt: number;
+    maxDriveMin: number;
+    maxDays: number | null;
+    dayBreaks: string[];
+    visitOverride: Record<string, number>;
+  };
 }
 
 export interface StoredTrip extends TripData {

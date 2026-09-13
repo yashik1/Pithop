@@ -100,6 +100,77 @@ const ok = (l,c,x='') => console.log(`${c?'PASS':'FAIL'}  ${l}${x?' | '+x:''}`);
   ok('reasons listed on the expanded card', (await p.locator('.score-why li').count()) > 0,
      (await p.locator('.score-why li').first().textContent() || '').slice(0,50));
 
+  // ---------- Day-by-day itinerary ----------
+  // Plan three stops, then switch to the itinerary view.
+  await p.evaluate(() => {
+    document.querySelectorAll('.stop-card .add-btn').forEach((b, i) => { if (i < 3) b.click(); });
+  });
+  await p.waitForTimeout(600);
+  ok('itinerary tab appears once stops are planned', (await p.locator('.view-tab').count()) === 2);
+
+  await p.locator('.view-tab', { hasText: 'Itinerary' }).click();
+  await p.waitForTimeout(700);
+  const dayCount = await p.locator('.itin-day').count();
+  ok('itinerary renders day cards', dayCount > 0, `${dayCount} days`);
+  ok('each stop shows a clock time', (await p.locator('.itin-time').count()) > 0,
+     await p.locator('.itin-time').first().textContent());
+  ok('day ends with an overnight or arrival', (await p.locator('.itin-row.end').count()) === dayCount);
+  ok('final day marked as arrival', (await p.locator('.itin-row.end.final').count()) === 1);
+
+  // Arrival times must move when the departure time changes.
+  const firstArrivalBefore = await p.locator('.itin-row:not(.depart) .itin-time').first().textContent();
+  await p.locator('.itin-controls input[type=datetime-local]').fill('2026-06-01T12:00');
+  await p.waitForTimeout(600);
+  const firstArrivalAfter = await p.locator('.itin-row:not(.depart) .itin-time').first().textContent();
+  ok('changing departure recomputes arrivals', firstArrivalBefore !== firstArrivalAfter,
+     `${firstArrivalBefore} -> ${firstArrivalAfter}`);
+
+  // Lowering the daily driving cap must split the trip into more days.
+  const daysBefore = await p.locator('.itin-day').count();
+  await p.locator('.itin-controls select').first().selectOption('180');
+  await p.waitForTimeout(600);
+  const daysAfter = await p.locator('.itin-day').count();
+  ok('a lower driving cap splits into more days', daysAfter >= daysBefore, `${daysBefore} -> ${daysAfter}`);
+
+  // "End day here" forces a break regardless of the cap.
+  await p.locator('.itin-controls select').first().selectOption('600');
+  await p.waitForTimeout(500);
+  const dBase = await p.locator('.itin-day').count();
+  await p.locator('.itin-break').first().click();
+  await p.waitForTimeout(600);
+  ok('End day here forces an extra day', (await p.locator('.itin-day').count()) > dBase,
+     `${dBase} -> ${await p.locator('.itin-day').count()}`);
+  ok('the break button reads as pressed', (await p.locator('.itin-break.active').count()) === 1);
+
+  // Changing how long you linger. Undo the forced break first: with a day
+  // boundary in the way, a longer visit on day 1 correctly does NOT move the
+  // final arrival, because the next day sets off at a fixed morning time
+  // whatever time the previous one ended.
+  await p.locator('.itin-break.active').first().click();
+  await p.waitForTimeout(600);
+  ok('removing the break returns to one day', (await p.locator('.itin-day').count()) === 1);
+
+  const visitBefore = await p.locator('.itin-day-meta').first().textContent();
+  const arriveBefore = await p.locator('.itin-row.end.final .itin-time').textContent();
+  await p.locator('.itin-day .itin-actions select').first().selectOption('180');
+  await p.waitForTimeout(600);
+  const visitAfter = await p.locator('.itin-day-meta').first().textContent();
+  const arriveAfter = await p.locator('.itin-row.end.final .itin-time').textContent();
+  ok('the chosen visit length is applied', visitBefore !== visitAfter, `${visitBefore} -> ${visitAfter}`);
+  ok('a longer visit delays the final arrival', arriveBefore !== arriveAfter, `${arriveBefore} -> ${arriveAfter}`);
+
+  // Removing a stop from the itinerary drops it from the plan.
+  const stopsBefore = await p.locator('.itin-name').count();
+  await p.locator('.itin-remove').first().click();
+  await p.waitForTimeout(600);
+  ok('removing a stop updates the schedule', (await p.locator('.itin-name').count()) < stopsBefore,
+     `${stopsBefore} -> ${await p.locator('.itin-name').count()}`);
+
+  // And back to the list.
+  await p.locator('.view-tab', { hasText: 'Stops' }).click();
+  await p.waitForTimeout(400);
+  ok('can switch back to the stop list', (await p.locator('.stop-card').count()) > 0);
+
   // /_vercel/insights/script.js only exists on Vercel's edge; `vite preview`
   // answers with index.html, which is not JS. Local-only, never in production.
   const real = errs.filter((e) => !/Unexpected token '<'/.test(e));

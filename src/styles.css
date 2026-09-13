@@ -3457,3 +3457,270 @@ body {
   background: #3b0764;
   color: #ddd6fe;
 }
+
+/* ---------- List / itinerary switch ---------- */
+
+.view-tabs {
+  display: flex;
+  gap: 6px;
+  margin: 10px 14px 2px;
+}
+
+.view-tab {
+  flex: 1;
+  min-height: 38px;
+  border: 1.5px solid var(--line-strong);
+  border-radius: 10px;
+  background: var(--card);
+  color: var(--ink-2);
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: border-color 0.15s var(--ease-out), color 0.15s var(--ease-out),
+    background 0.15s var(--ease-out), transform 0.12s var(--ease-out);
+}
+
+.view-tab.active {
+  border-color: var(--primary);
+  background: var(--primary);
+  color: #fff;
+}
+
+.view-tab:active {
+  transform: scale(0.98);
+}
+
+/* ---------- Day-by-day itinerary ---------- */
+
+.itinerary {
+  padding: 4px 14px 16px;
+}
+
+.itin-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.itin-controls label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--ink-3);
+}
+
+.itin-controls input,
+.itin-controls select {
+  min-height: 36px;
+  padding: 0 8px;
+  border: 1px solid var(--line-strong);
+  border-radius: 9px;
+  background: var(--card);
+  color: var(--ink);
+  font-family: inherit;
+  font-size: 13px;
+}
+
+.itin-summary {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ink-2);
+  margin-bottom: 8px;
+}
+
+.itin-warnings {
+  margin: 6px 0;
+  padding-left: 18px;
+  font-size: 12.5px;
+  line-height: 1.6;
+  color: #92400e;
+}
+
+.itin-day {
+  margin-bottom: 12px;
+  padding: 11px 12px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--card);
+  box-shadow: var(--shadow-1);
+}
+
+.itin-day-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+
+.itin-day-head h3 {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--ink);
+}
+
+.itin-day-meta {
+  font-size: 12px;
+  color: var(--ink-3);
+  font-variant-numeric: tabular-nums;
+}
+
+/* A timeline: a fixed-width clock column so the times line up down the day. */
+.itin-row {
+  display: flex;
+  gap: 10px;
+  padding: 6px 0;
+  border-top: 1px dashed var(--line);
+}
+
+.itin-row.depart {
+  border-top: none;
+}
+
+.itin-time {
+  flex: none;
+  width: 52px;
+  font-size: 12.5px;
+  font-weight: 800;
+  color: var(--primary-deep);
+  font-variant-numeric: tabular-nums;
+}
+
+.itin-what {
+  flex: 1;
+  min-width: 0;
+  font-size: 13px;
+  color: var(--ink-2);
+}
+
+.itin-name {
+  padding: 0;
+  border: none;
+  background: none;
+  font-family: inherit;
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--ink);
+  text-align: left;
+  cursor: pointer;
+}
+
+.itin-sub {
+  font-size: 11.5px;
+  color: var(--ink-3);
+  margin-top: 2px;
+}
+
+.itin-row.closed .itin-sub {
+  color: #b45309;
+  font-weight: 700;
+}
+
+.itin-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+  flex-wrap: wrap;
+}
+
+.itin-actions select {
+  min-height: 30px;
+  padding: 0 6px;
+  border: 1px solid var(--line-strong);
+  border-radius: 8px;
+  background: var(--card);
+  color: var(--ink-2);
+  font-family: inherit;
+  font-size: 12px;
+}
+
+.itin-break,
+.itin-remove {
+  min-height: 30px;
+  padding: 0 8px;
+  border: 1px solid var(--line-strong);
+  border-radius: 8px;
+  background: var(--card);
+  color: var(--ink-3);
+  font-family: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.15s var(--ease-out), color 0.15s var(--ease-out),
+    border-color 0.15s var(--ease-out), transform 0.12s var(--ease-out);
+}
+
+.itin-break.active {
+  background: #1e293b;
+  border-color: #1e293b;
+  color: #fff;
+}
+
+.itin-break:active,
+.itin-remove:active {
+  transform: scale(0.96);
+}
+
+.itin-row.end {
+  border-top: 1px solid var(--line-strong);
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.itin-row.end.final .itin-what {
+  color: var(--primary-deep);
+  font-weight: 800;
+}
+
+.itin-beds {
+  margin-top: 7px;
+  font-size: 12px;
+  color: var(--ink-3);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: baseline;
+}
+
+.itin-beds-label {
+  font-weight: 700;
+}
+
+.itin-bed {
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: var(--line);
+  color: var(--ink-2);
+}
+
+.itin-bed a {
+  color: var(--primary-deep);
+  text-decoration: none;
+}
+
+/* Visually hidden but read aloud — used for labels on icon-only controls. */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+:root[data-theme='dark'] .itin-warnings {
+  color: #fbbf24;
+}
+:root[data-theme='dark'] .itin-row.closed .itin-sub {
+  color: #fbbf24;
+}
