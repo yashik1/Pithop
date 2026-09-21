@@ -3,10 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta
-      name="description"
-      content="Pithop is a free road trip planner. Enter where you're driving from and to, and it maps your route and finds the best stops along the way — scenic viewpoints, quirky attractions, nature, history, museums and food — then guides you there with live in-browser navigation. No download required."
-    />
+    <meta name="description" content="Free road trip planner that finds the best stops along your route — scenic viewpoints, hidden gems, food and history — then navigates you there." />
     <meta name="theme-color" content="#2563eb" />
     <!-- max-image-preview:large lets Google use the full-size preview image in
          results and Discover; the defaults would show a thumbnail or nothing. -->
@@ -107,64 +104,153 @@
       :root[data-theme='dark'] #root {
         background: #0f1826;
       }
-      /* Static landing shown in the served HTML (so search engines and
-         reviewers can read what the app is) and as a branded loading screen
-         until the app's JavaScript mounts and replaces it. */
+      /* Static landing shown in the served HTML (so search engines, AI answer
+         engines and OAuth reviewers can read what the app is) and as the first
+         paint until the app's JavaScript mounts and replaces it.
+
+         The hero is centred and the prose below it is left-aligned: centred
+         text is fine for a headline and tiring for paragraphs. */
       .preload {
-        max-width: 640px;
+        max-width: 660px;
         margin: 0 auto;
-        padding: 56px 24px;
+        padding: 48px 24px 64px;
         font-family: system-ui, -apple-system, 'Segoe UI', Roboto, Arial, sans-serif;
         color: #1e3a8a;
+      }
+      .preload h1,
+      .preload .lede,
+      .preload .sub,
+      .preload .loading {
         text-align: center;
       }
       .preload h1 {
         font-size: 34px;
-        margin: 0 0 6px;
+        margin: 0 0 10px;
       }
       .preload .lede {
-        font-size: 17px;
-        font-weight: 600;
+        font-size: 20px;
+        font-weight: 700;
         color: #2563eb;
-        margin: 0 0 18px;
+        margin: 0 0 10px;
+      }
+      .preload .sub {
+        font-size: 16px;
+        margin: 0 0 8px;
+      }
+      .preload h2 {
+        font-size: 17px;
+        margin: 28px 0 8px;
+        color: #1e3a8a;
       }
       .preload p {
         font-size: 15px;
-        line-height: 1.6;
+        line-height: 1.65;
         color: #46586f;
       }
+      .preload .journey {
+        font-size: 15px;
+        line-height: 1.7;
+        color: #46586f;
+        padding-left: 20px;
+      }
+      .preload .journey li {
+        margin-bottom: 4px;
+      }
+      .preload .journey strong {
+        color: #1e3a8a;
+      }
       .preload .loading {
-        margin-top: 22px;
+        margin-top: 30px;
         font-size: 13px;
         color: #7d8ea6;
       }
-      :root[data-theme='dark'] .preload {
+      :root[data-theme='dark'] .preload,
+      :root[data-theme='dark'] .preload h2 {
         color: #dbe6ff;
       }
-      :root[data-theme='dark'] .preload p {
+      :root[data-theme='dark'] .preload p,
+      :root[data-theme='dark'] .preload .journey {
         color: #aebdd1;
+      }
+      :root[data-theme='dark'] .preload .journey strong {
+        color: #dbe6ff;
       }
     </style>
   </head>
   <body>
     <div id="root">
-      <!-- Replaced by the app on load; present so the home page explains
-           itself without JavaScript (for crawlers and OAuth review). -->
+      <!-- The served HTML landing. Replaced by the app once its JavaScript
+           mounts, so for a traveller this is the first paint; for a crawler,
+           an OAuth reviewer or an AI answer engine — none of which reliably
+           run JavaScript — it is the whole page, and therefore has to explain
+           the product on its own. -->
       <div class="preload">
         <h1>🛣️ Pithop — Road Trip Planner</h1>
-        <p class="lede">A free road trip planner that finds the best stops along your route.</p>
-        <p>
-          Enter where you're driving from and to, and Pithop maps your route and finds interesting places to stop
-          along the way — scenic viewpoints, quirky roadside attractions, nature and parks, history, museums, and
-          food — filtered by how far off your route they are and how long you'd like to stop. Add multiple stops
-          along the way, compare route options including toll-free ones, and see whether a place will still be
-          open by the time you get there.
+        <p class="lede">Don't just get there. Enjoy the way there.</p>
+        <p class="sub">
+          Pithop finds the places worth stopping for along your journey, then plans the drive around them.
         </p>
-        <p>
-          Save your trips for offline use, follow them with live in-browser navigation and voice turn-by-turn
-          directions, and optionally sign in to share great places with other travellers. It runs in your browser
-          with nothing to download, and works on phones, tablets and desktops.
-        </p>
+
+        <section>
+          <h2>What a Pithop trip looks like</h2>
+          <p>
+            Say you are driving from Toronto to Montreal. Most planners give you one line on a map and an arrival
+            time. Pithop gives you the day:
+          </p>
+          <ol class="journey">
+            <li><strong>8:00 AM — Toronto.</strong> Set off.</li>
+            <li><strong>A hidden waterfall,</strong> twelve minutes off the highway, that you would never have found from the road.</li>
+            <li><strong>Lunch at a local diner</strong> rather than the third identical service station.</li>
+            <li><strong>A historic town</strong> worth an hour on foot, reached while its museum is still open.</li>
+            <li><strong>A scenic viewpoint</strong> timed for the light.</li>
+            <li><strong>6:40 PM — Montreal.</strong> Arrive having actually seen something.</li>
+          </ol>
+        </section>
+
+        <section>
+          <h2>How it works</h2>
+          <p>
+            Enter where you are driving from and to, and Pithop maps the route and searches the corridor either
+            side of it for places worth pulling over for: scenic viewpoints, quirky roadside attractions, nature
+            and parks, history, museums, and food. Every place is real, drawn from OpenStreetMap, Wikipedia and
+            Wikivoyage rather than invented, and each one is scored for how well it fits your particular trip.
+          </p>
+          <p>
+            Tell Pithop what kind of traveller you are — scenic explorer, foodie, hidden gems, history, family,
+            pet friendly, photography, budget, outdoor adventure — and the ranking changes to match. Every
+            suggestion shows what it will actually cost you: the detour there and back, how long people usually
+            stay, and the total extra time, with a plain verdict on whether it is worth it.
+          </p>
+        </section>
+
+        <section>
+          <h2>Planning the days, not just the route</h2>
+          <p>
+            Choose your stops and Pithop turns them into a schedule: what time you reach each one, where a day
+            realistically has to end, and somewhere to sleep when it does. Set how much driving you are willing to
+            do in a day and it splits the trip accordingly. Change your departure time, linger longer somewhere,
+            or end a day early, and every later arrival is recalculated.
+          </p>
+          <p>
+            It also tells you what is going to go wrong before it does — a museum that will have closed by the
+            time you arrive, a day that runs past your driving limit, a trip that needs more days than you have.
+          </p>
+        </section>
+
+        <section>
+          <h2>On the road</h2>
+          <p>
+            Add several stops along the way and Pithop routes through them in one drive. Compare route options,
+            including a toll-free alternative, or avoid motorways entirely. Save a trip and it keeps working
+            offline, so it is still there when the signal is not. When you set off, follow it with live
+            turn-by-turn navigation and voice directions in the browser itself.
+          </p>
+          <p>
+            Pithop is free, runs in any browser with nothing to download, works on phones, tablets and desktops,
+            and is available in eighteen languages.
+          </p>
+        </section>
+
         <p class="loading">Loading the map…</p>
       </div>
     </div>
