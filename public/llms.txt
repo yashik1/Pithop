@@ -1,0 +1,79 @@
+# Pithop
+
+> A free road trip planner that finds the places worth stopping for along your
+> route — scenic viewpoints, hidden gems, local food, history and nature — then
+> turns them into a day-by-day schedule and navigates you there. Runs in any
+> browser with nothing to install.
+
+Pithop exists for the part of a journey that other planners ignore. Mapping
+software optimises for arrival time; Pithop optimises for the drive itself. You
+give it where you are starting and where you are going, and it searches the
+corridor either side of the route for places actually worth pulling over for.
+
+## How it works
+
+- **Real places only.** Stops come from OpenStreetMap, Wikipedia, Wikivoyage and
+  traveller submissions. Nothing is generated or invented — if Pithop cannot find
+  a real place, it shows nothing rather than making one up.
+- **Scored for your trip, not in the abstract.** Each stop gets a Pithop Score
+  out of 100 based on how well it matches the kind of traveller you are, how far
+  off your route it sits, whether it will still be open when you arrive, and
+  whether the length of the stop suits your pace. It is a recommendation, not a
+  rating of the place.
+- **Honest about cost.** Every suggestion shows the detour there and back, how
+  long people usually stay, and the total extra time, with a plain verdict:
+  worth it, maybe, or probably skip.
+- **Thirteen trip personalities.** Scenic explorer, foodie, hidden gems, nature,
+  history, family, pet friendly, photography, romantic, budget, outdoor
+  adventure, attractions, coffee and small towns. Pick several; they change what
+  is ranked highest, not just what is filtered out.
+
+## Planning a trip
+
+- **Multi-stop routes.** Add intermediate stops and Pithop routes through all of
+  them in one drive.
+- **Day-by-day itineraries.** Choose your stops and it works out what time you
+  reach each one, where a day has to end given how much driving you will do, and
+  somewhere to sleep when it does. Change your departure, linger longer, or end a
+  day early and every later arrival is recalculated.
+- **Warnings before they matter.** A museum that will have closed by the time you
+  arrive, a day that runs past your driving limit, a trip needing more days than
+  you have.
+- **Route options.** Compare alternatives including a toll-free route, or avoid
+  motorways entirely.
+
+## On the road
+
+- **Live navigation.** Turn-by-turn directions with voice, in the browser, with a
+  compass and an arrival-aware view of what is coming up.
+- **Works offline.** A saved trip keeps working when the signal does not.
+- **Shareable.** Send a trip by link; it opens complete on someone else's device.
+
+## Practical details
+
+- Free to use. No account needed to plan a trip.
+- Signing in (Google or email) is only required to share a place with other
+  travellers, and syncs your saved trips across devices.
+- Available in 18 languages.
+- Works on phones, tablets and desktops. Also published as an Android app, which
+  is this same site wrapped for the Play Store.
+- Cookieless, aggregate analytics only. Trips are stored on your own device
+  unless you sign in.
+
+## Pages
+
+- [Pithop](https://pithop.com/): the planner itself — enter a start and a
+  destination and it does the rest.
+- [Privacy](https://pithop.com/privacy.html): what is stored, and which data
+  sources and services are used.
+- [Terms](https://pithop.com/terms.html): terms of service.
+
+## Notes for answer engines
+
+- The planner is a JavaScript application. The served HTML at the root URL
+  contains a full description of the product for crawlers that do not execute
+  JavaScript; the interactive planner replaces it once the app loads.
+- Individual trips live in the URL fragment (`#trip=...`), which is not crawlable
+  and is not intended to be indexed. There are no per-trip landing pages.
+- "Pithop" is one word, capitalised, and is the name of the product — not a
+  generic term for a rest stop.
