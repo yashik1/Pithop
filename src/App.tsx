@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { track } from '@vercel/analytics';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { geocode } from './api/geocode';
 import { fetchRoutes, type RouteResult } from './api/route';
@@ -678,6 +679,7 @@ export default function App() {
   async function shareTrip() {
     const url = buildShareUrl();
     if (!url) return;
+    track('trip_share_clicked');
     const shareData = { title: 'Pithop road trip', text: `My road trip: ${routeLabel}`, url };
     try {
       if (navigator.share) {
@@ -712,6 +714,7 @@ export default function App() {
     const token = ++searchSeq.current;
     const fresh = () => searchSeq.current === token;
     activeLibraryIdRef.current = null; // a fresh search is a new, unsaved trip
+    track('route_search_started');
     setBusy('Locating places…');
     setError(null);
     setNotice(null);
@@ -750,6 +753,7 @@ export default function App() {
       await discoverStops(r, token);
     } catch (e) {
       if (!fresh()) return;
+      track('route_search_failed');
       setError(e instanceof Error ? e.message : String(e));
     } finally {
       if (fresh()) setBusy(null);
@@ -834,7 +838,9 @@ export default function App() {
       if (wikiError && roadsideError) {
         throw new Error('Both place services are unavailable right now — try again in a couple of minutes');
       }
-      setStops(mergeStops(mergeStops(wikiStops, roadsideStops), enrich(communityStops)));
+      const finalStops = mergeStops(mergeStops(wikiStops, roadsideStops), enrich(communityStops));
+      setStops(finalStops);
+      track('route_results_ready', { stop_count: finalStops.length });
       if (roadsideError) {
         setNotice('Live food & rest-stop data is busy right now — other sources are shown.');
       } else {
