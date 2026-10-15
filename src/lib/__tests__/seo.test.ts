@@ -13,6 +13,15 @@ import llms from '../../../public/llms.txt?raw';
 import robots from '../../../public/robots.txt?raw';
 import sitemap from '../../../public/sitemap.xml?raw';
 
+// Every static page, keyed by the path it is served at ("guides/x.html"), so
+// the sitemap can be checked against the real pages. A glob rather than a list
+// of imports: a new route guide is then covered the moment it is added.
+const pages: Record<string, string> = Object.fromEntries(
+  Object.entries(
+    import.meta.glob('../../../public/**/*.html', { query: '?raw', import: 'default', eager: true }),
+  ).map(([path, source]) => [path.replace('../../../public/', ''), source as string]),
+);
+
 const attr = (name: string): string => {
   const m = new RegExp(`<meta\\s+name="${name}"\\s+content="([^"]*)"`, 's').exec(html);
   return m ? m[1].replace(/\s+/g, ' ').trim() : '';
@@ -76,11 +85,21 @@ describe('crawler-facing files', () => {
     expect(robots).toContain('Sitemap: https://pithop.com/sitemap.xml');
   });
 
-  it('only lists the home page in the sitemap, and it is indexable', () => {
-    // privacy.html and terms.html carry noindex, so listing them would ask
-    // Google to index pages that refuse to be indexed.
+  it('lists only indexable pages in the sitemap', () => {
+    // Asking Google to index a page that refuses to be indexed is the mistake
+    // this guards — it is what produced the "Discovered - currently not
+    // indexed" report in Search Console. Checked against the files themselves
+    // rather than a fixed list of URLs, so adding a route guide is free while
+    // listing privacy.html or terms.html still fails.
     const locs = [...sitemap.matchAll(/<loc>([^<]+)<\/loc>/g)].map((m) => m[1]);
-    expect(locs).toEqual(['https://pithop.com/']);
+    expect(locs).toContain('https://pithop.com/');
     expect(html).not.toMatch(/<meta name="robots" content="[^"]*noindex/);
+
+    const noindexed = locs.filter((loc) => {
+      const path = loc.replace('https://pithop.com/', '');
+      if (path === '') return false; // the app shell, asserted above
+      return /<meta name="robots" content="[^"]*noindex/.test(pages[path] ?? '');
+    });
+    expect(noindexed).toEqual([]);
   });
 });

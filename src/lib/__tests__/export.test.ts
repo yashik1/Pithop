@@ -4,6 +4,7 @@ import {
   appleMapsMultiStopUrl,
   buildSharePayload,
   planAsVias,
+  shareTripUrl,
 } from '../export';
 import type { Stop } from '../../types';
 
@@ -28,9 +29,15 @@ describe('googleMapsMultiStopUrl', () => {
       { lat: 42, lng: -79 },
       [{ lat: 41, lng: -79.5 }],
     );
-    expect(url).toContain('origin=40,-80');
-    expect(url).toContain('destination=42,-79');
-    expect(url).toContain('waypoints=41,-79.5');
+    // Read back through searchParams rather than matching the raw string:
+    // URLSearchParams percent-encodes the commas as %2C, which Google decodes
+    // perfectly well, so asserting the literal text tested the encoding rather
+    // than the link.
+    const p = new URL(url).searchParams;
+    expect(p.get('origin')).toBe('40,-80');
+    expect(p.get('destination')).toBe('42,-79');
+    expect(p.get('waypoints')).toBe('41,-79.5');
+    expect(p.get('travelmode')).toBe('driving');
     expect(url.startsWith('https://www.google.com/maps/dir/?')).toBe(true);
   });
 });
@@ -58,6 +65,45 @@ describe('buildSharePayload', () => {
     expect(data.w).toEqual(['Waco']);
     expect(data.p).toHaveLength(1);
     expect(data.p[0].n).toBe('Stop a');
+  });
+});
+
+// This is the function App.tsx calls when someone taps Share, and the encoder
+// now lives here while its decoder (parseShareHash) stays in App.tsx — so these
+// guard the contract between the two.
+describe('shareTripUrl', () => {
+  const trip = { fromText: 'Austin', toText: 'Dallas', plan: [stop('a', 30.2, -97.7, 50)] };
+
+  it('puts the trip in the fragment, where it never reaches the server', () => {
+    const url = new URL(shareTripUrl({ ...trip, base: 'https://pithop.com/' }));
+    expect(url.search).toBe('');
+    expect(url.hash.startsWith('#trip=')).toBe(true);
+  });
+
+  // parseShareHash captures the payload with [^&]+, so anything outside the
+  // base64 alphabet would silently truncate the trip on the way back in.
+  it('encodes to characters the decoder can capture whole', () => {
+    const url = shareTripUrl({
+      ...trip,
+      viaTexts: ['Smith & Sons'],
+      base: 'https://pithop.com/',
+    });
+    expect(url.slice(url.indexOf('#trip=') + 6)).toMatch(/^[A-Za-z0-9+/=]+$/);
+  });
+
+  // btoa throws on anything outside Latin-1, so the percent-escape has to come
+  // first. Without that order, sharing a trip through Kyoto or Athens crashes.
+  it('survives place names outside Latin-1', () => {
+    const url = shareTripUrl({
+      fromText: '東京',
+      toText: 'Αθήνα',
+      plan: [{ ...stop('a', 35, 135, 10), name: '清水寺 — 🏯' }],
+      base: 'https://pithop.com/',
+    });
+    const data = JSON.parse(decodeURIComponent(atob(url.split('#trip=')[1])));
+    expect(data.f).toBe('東京');
+    expect(data.t).toBe('Αθήνα');
+    expect(data.p[0].n).toBe('清水寺 — 🏯');
   });
 });
 
