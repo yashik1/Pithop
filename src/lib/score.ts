@@ -19,17 +19,11 @@ export type PersonalityId =
 export interface Personality {
   id: PersonalityId;
   emoji: string;
-  /** Categories the chip narrows the list to when tapped. */
   cats: CategoryId[];
-  /** Ranking weight per category. 1 = neutral; above 1 promotes. */
   weights: Partial<Record<CategoryId, number>>;
-  /** Finer-grained promotion for specific place kinds. */
   kinds?: Record<string, number>;
 }
 
-// Thirteen travel personalities. `cats` drives filtering (what you see at all)
-// and `weights`/`kinds` drive ranking (what floats to the top) — a personality
-// that only filtered would make every remaining stop look equally good.
 export const PERSONALITIES: Personality[] = [
   { id: 'scenic', emoji: '🌄', cats: ['views', 'nature'], weights: { views: 2, nature: 1.4 } },
   { id: 'foodie', emoji: '🍽️', cats: ['food'], weights: { food: 2 }, kinds: { restaurant: 1.3, ice_cream: 1.15 } },
@@ -54,11 +48,12 @@ export type Pace = 'relaxed' | 'balanced' | 'efficient';
 
 export interface TripPrefs {
   personalities: PersonalityId[];
-  /** The traveller's own max-detour filter, in minutes (round trip). */
   maxDetourMin: number;
   pace: Pace;
   withKids: boolean;
   withPets: boolean;
+  /** Prefer EV charging and longer dwell at rest/charging stops. */
+  ev: boolean;
   budget: 'low' | 'mid' | 'any';
 }
 
@@ -68,14 +63,13 @@ export const DEFAULT_PREFS: TripPrefs = {
   pace: 'balanced',
   withKids: false,
   withPets: false,
+  ev: false,
   budget: 'any',
 };
 
-// Why a stop scored the way it did. Codes, not sentences, so the UI can
-// translate them — score.ts stays free of copy and of the i18n module.
 export type ReasonCode =
   | 'matchesVibe' | 'shortDetour' | 'longDetour' | 'openOnArrival' | 'closedOnArrival'
-  | 'hasPhoto' | 'travellerPick' | 'hiddenGem' | 'quickStop' | 'kidFriendly';
+  | 'hasPhoto' | 'travellerPick' | 'hiddenGem' | 'quickStop' | 'kidFriendly' | 'evFriendly';
 
 export interface ScoreReason {
   code: ReasonCode;
@@ -85,48 +79,31 @@ export interface ScoreReason {
 export type Verdict = 'worth' | 'maybe' | 'skip';
 
 export interface ScoredStop {
-  /** 0-100, rounded. */
   score: number;
   reasons: ScoreReason[];
   verdict: Verdict;
-  /** Detour there and back plus time spent at the place. */
   totalExtraMin: number;
 }
 
 export interface ScoreContext {
-  /** Projected arrival, used to judge opening hours. Omit to skip that factor. */
   eta?: Date;
 }
 
-// The kinds of place the brief means by "hidden gem": small museums, waterfalls,
-// viewpoints, quirky roadside stops, local history. Deliberately excludes the
-// things every route has — fuel, restrooms, fast food, chain stops.
 const GEM_KINDS = new Set([
   'viewpoint', 'waterfall', 'picnic_site', 'historic_site', 'ruins', 'monument',
   'memorial', 'museum', 'gallery', 'attraction', 'artwork', 'nature_reserve', 'park',
 ]);
 
-// A hidden gem is somewhere interesting that is NOT the obvious stop:
-// traveller-vouched, traveller-curated, a described-but-unphotographed landmark,
-// or an interesting kind of place a little way off the main road. Fuel and
-// restrooms never qualify however they were found.
 export function isHiddenGem(s: Stop): boolean {
   if (s.category === 'rest') return false;
   if (s.source === 'community') return true;
   if (s.wikiUrl?.includes('wikivoyage')) return true;
   if (s.source === 'wiki') return !s.imageUrl && Boolean(s.description) && s.offRouteKm > 1.5;
-  // Map-data places (OSM/Geoapify): the kind has to be interesting AND the place
-  // has to sit off the highway, which is what separates a gem from a services
-  // sign. 1 km is roughly "you have to mean it".
   return GEM_KINDS.has(s.kind) && s.offRouteKm > 1;
 }
 
-/** Clamp helper — keeps every sub-score inside 0..1 before weighting. */
 const unit = (n: number): number => (n < 0 ? 0 : n > 1 ? 1 : n);
 
-// How well the place matches the chosen personalities. Neutral (0.55) when the
-// traveller has picked none, so an unfiltered trip still ranks on quality and
-// detour rather than collapsing every stop to the same number.
 function matchFactor(s: Stop, prefs: TripPrefs): number {
   if (prefs.personalities.length === 0) return 0.55;
   let best = 0;
@@ -137,12 +114,9 @@ function matchFactor(s: Stop, prefs: TripPrefs): number {
     if (w > best) best = w;
   }
   if (prefs.personalities.includes('hidden') && isHiddenGem(s)) best *= 1.25;
-  // Weights top out around 2.6; normalise that range onto 0..1.
   return unit(best / 2.6);
 }
 
-// Signals that a place is genuinely worth someone's time: a photo, a real
-// description, an article to read, or another traveller vouching for it.
 function qualityFactor(s: Stop): number {
   let q = 0.3;
   if (s.imageUrl) q += 0.3;
@@ -152,17 +126,11 @@ function qualityFactor(s: Stop): number {
   return unit(q);
 }
 
-// Detour cost, measured against the traveller's own tolerance rather than an
-// absolute figure: 25 minutes is cheap to someone hunting hidden gems and
-// expensive to someone trying to get there.
 function detourFactor(s: Stop, prefs: TripPrefs): number {
   const allowance = Math.max(5, prefs.maxDetourMin);
   return unit(1 - s.detourMin / (allowance * 1.4));
 }
 
-// Closed when you arrive is close to disqualifying; open is worth a real nudge.
-// Unknown hours stay neutral — most OSM places carry none, and guessing would
-// punish them for a gap in the data rather than anything about the place.
 function openFactor(s: Stop, ctx: ScoreContext): number {
   if (!s.hours || !ctx.eta) return 0.55;
   const st = hoursStatus(s.hours, ctx.eta);
@@ -170,11 +138,9 @@ function openFactor(s: Stop, ctx: ScoreContext): number {
   return st.open ? 1 : 0.05;
 }
 
-// Does the length of the stop suit the pace of the trip?
 function fitFactor(s: Stop, prefs: TripPrefs): number {
   const ideal = prefs.pace === 'efficient' ? 25 : prefs.pace === 'relaxed' ? 90 : 50;
   const ratio = s.visitMin / ideal;
-  // Bell-ish: 1 at the ideal, tailing off either side of it.
   return unit(1 - Math.abs(Math.log(Math.max(ratio, 0.05))) / 2.2);
 }
 
@@ -196,19 +162,21 @@ export function pithopScore(s: Stop, prefs: TripPrefs, ctx: ScoreContext = {}): 
     f.fit * WEIGHTS.fit;
 
   const gem = isHiddenGem(s);
-  if (gem) raw += 0.06; // a small, flat nudge — gems are the point of the app
+  if (gem) raw += 0.06;
   if (prefs.withKids && (s.kind === 'zoo' || s.kind === 'aquarium' || s.kind === 'theme_park' || s.kind === 'park')) {
     raw += 0.04;
   }
   if (prefs.withPets && (s.kind === 'park' || s.kind === 'picnic_site' || s.kind === 'nature_reserve')) {
     raw += 0.04;
   }
+  if (prefs.ev && (s.kind === 'charging_station' || s.kind === 'services')) {
+    raw += 0.08;
+  }
   if (prefs.budget === 'low' && s.parking === 'paid') raw -= 0.05;
 
   const score = Math.max(0, Math.min(100, Math.round(raw * 100)));
   const totalExtraMin = s.detourMin + s.visitMin;
 
-  // Reasons, strongest first, capped at three so the card stays readable.
   const reasons: ScoreReason[] = [];
   if (f.match >= 0.6 && prefs.personalities.length > 0) reasons.push({ code: 'matchesVibe' });
   if (gem) reasons.push({ code: 'hiddenGem' });
@@ -221,14 +189,12 @@ export function pithopScore(s: Stop, prefs: TripPrefs, ctx: ScoreContext = {}): 
   if (prefs.withKids && (s.kind === 'zoo' || s.kind === 'aquarium' || s.kind === 'theme_park')) {
     reasons.push({ code: 'kidFriendly' });
   }
+  if (prefs.ev && s.kind === 'charging_station') reasons.push({ code: 'evFriendly' });
   if (s.detourMin > prefs.maxDetourMin) reasons.push({ code: 'longDetour', value: s.detourMin });
 
   return { score, reasons: reasons.slice(0, 3), verdict: verdictFor(score, totalExtraMin, prefs), totalExtraMin };
 }
 
-// How much extra time the traveller will plausibly accept for one stop. Someone
-// hunting hidden gems or taking it slow will go further out of their way than
-// someone optimising the drive.
 function allowanceMin(prefs: TripPrefs): number {
   let a = prefs.maxDetourMin + (prefs.pace === 'relaxed' ? 75 : prefs.pace === 'efficient' ? 25 : 45);
   if (prefs.personalities.includes('hidden')) a *= 1.25;
