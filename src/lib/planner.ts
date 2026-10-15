@@ -11,6 +11,7 @@
 import type { Stop } from '../types';
 import type { CategoryId } from './categories';
 import { pithopScore, DEFAULT_PREFS, type ScoreContext, type TripPrefs } from './score';
+import { hoursStatus } from './hours';
 
 const MAX_PICKS = 12;
 const MIN_SPACING_KM = 8;
@@ -21,8 +22,6 @@ export function surprisePlan(
   prefs: TripPrefs = DEFAULT_PREFS,
   ctx: ScoreContext = {},
 ): string[] {
-  // Score every candidate once up front — it does not depend on what has been
-  // picked so far, so recomputing it inside the loop would only cost time.
   const scoreById = new Map(stops.map((s) => [s.id, pithopScore(s, prefs, ctx).score]));
   const picked: Stop[] = [];
   const catCount = new Map<CategoryId, number>();
@@ -34,14 +33,9 @@ export function surprisePlan(
     for (const s of pool) {
       const cost = s.visitMin + s.detourMin;
       if (cost > remaining || picked.includes(s)) continue;
-      // Keep stops spread along the drive, not clustered in one town.
       if (picked.some((p) => Math.abs(p.alongKm - s.alongKm) < MIN_SPACING_KM)) continue;
-      // Quality comes from the shared Pithop Score, so Surprise Me agrees with
-      // the number shown on the card rather than ranking by its own rules.
-      const quality = (scoreById.get(s.id) ?? 0) / 50; // ~0..2
-      // Diversity: each repeat of a category is worth progressively less.
+      const quality = (scoreById.get(s.id) ?? 0) / 50;
       const diversity = 1 / (1 + (catCount.get(s.category) ?? 0));
-      // Efficiency: time spent enjoying vs. time spent detouring.
       const efficiency = s.visitMin / cost;
       const score = quality * diversity * efficiency * (0.8 + Math.random() * 0.4);
       if (score > bestScore) {
@@ -57,9 +51,6 @@ export function surprisePlan(
   return picked.map((s) => s.id);
 }
 
-// Detour Roulette: one random wildcard pick, weighted toward the quirky stuff
-// (attractions first, scenery next) and places with photos. Never re-deals the
-// stop currently on the wheel when there's any alternative.
 export function rouletteSpin(stops: Stop[], excludeId?: string): Stop | null {
   const pool = stops.filter((s) => s.id !== excludeId);
   const candidates = pool.length ? pool : stops;
@@ -76,9 +67,6 @@ export function rouletteSpin(stops: Stop[], excludeId?: string): Stop | null {
   return candidates[candidates.length - 1];
 }
 
-// Road Trip Bingo: a 4x4 card mixing real stops from this route with classic
-// road-trip sightings. Squares are shuffled once per trip and persisted so the
-// card survives reloads mid-drive.
 export interface BingoSquare {
   text: string;
   stopId?: string;
@@ -105,7 +93,6 @@ const SIGHTINGS = [
 
 export function buildBingoCard(stops: Stop[]): BingoSquare[] {
   const shuffled = <T,>(arr: T[]) => [...arr].sort(() => Math.random() - 0.5);
-  // Up to 6 real stops (short names read best on a small square).
   const stopSquares: BingoSquare[] = shuffled(stops.filter((s) => s.name.length <= 28))
     .slice(0, 6)
     .map((s) => ({ text: s.name, stopId: s.id }));
@@ -115,7 +102,6 @@ export function buildBingoCard(stops: Stop[]): BingoSquare[] {
   return shuffled([...stopSquares, ...fillers]);
 }
 
-// All 4-in-a-row lines on a 4x4 card: rows, columns, both diagonals.
 const BINGO_LINES: number[][] = [
   ...Array.from({ length: 4 }, (_, r) => [0, 1, 2, 3].map((c) => r * 4 + c)),
   ...Array.from({ length: 4 }, (_, c) => [0, 1, 2, 3].map((r) => r * 4 + c)),
@@ -127,5 +113,104 @@ export function bingoLineCount(marked: boolean[]): number {
   return BINGO_LINES.filter((line) => line.every((i) => marked[i])).length;
 }
 
-// Trip vibes used to live here as four presets. They are now the thirteen trip
-// personalities in score.ts, which both filter the list and weight the ranking.
+export interface OptimizeResult {
+  planIds: string[];
+  totalExtraMin: number;
+  dropped: Array<{ id: string; reason: 'budget' | 'closed' | 'lowScore' }>;
+}
+
+export function optimizePlan(
+  candidates: Stop[],
+  budgetMin: number,
+  prefs: TripPrefs = DEFAULT_PREFS,
+  opts: {
+    preferredIds?: ReadonlySet<string>;
+    ctx?: ScoreContext;
+    skipClosed?: boolean;
+    minScore?: number;
+  } = {},
+): OptimizeResult {
+  const minScore = opts.minScore ?? 40;
+  const preferred = opts.preferredIds ?? new Set<string>();
+  const scored = candidates
+    .map((s) => ({ stop: s, scored: pithopScore(s, prefs, opts.ctx) }))
+    .filter(({ scored: sc }) => sc.score >= minScore);
+
+  scored.sort((a, b) => {
+    const ap = preferred.has(a.stop.id) ? 1 : 0;
+    const bp = preferred.has(b.stop.id) ? 1 : 0;
+    if (ap !== bp) return bp - ap;
+    return b.scored.score - a.scored.score;
+  });
+
+  const kept: Stop[] = [];
+  const dropped: OptimizeResult['dropped'] = [];
+  let used = 0;
+
+  for (const { stop, scored: sc } of scored) {
+    if (opts.skipClosed && opts.ctx?.eta && stop.hours) {
+      const hs = hoursStatus(stop.hours, opts.ctx.eta);
+      if (hs && !hs.open) {
+        dropped.push({ id: stop.id, reason: 'closed' });
+        continue;
+      }
+    }
+    const cost = stop.visitMin + stop.detourMin;
+    if (used + cost > budgetMin) {
+      dropped.push({ id: stop.id, reason: 'budget' });
+      continue;
+    }
+    if (kept.some((k) => Math.abs(k.alongKm - stop.alongKm) < 5) && !preferred.has(stop.id)) {
+      dropped.push({ id: stop.id, reason: 'lowScore' });
+      continue;
+    }
+    kept.push(stop);
+    used += cost;
+  }
+
+  kept.sort((a, b) => a.alongKm - b.alongKm);
+  return {
+    planIds: kept.map((s) => s.id),
+    totalExtraMin: Math.round(used),
+    dropped,
+  };
+}
+
+export function suggestInsert(
+  allStops: Stop[],
+  plan: Stop[],
+  prefs: TripPrefs = DEFAULT_PREFS,
+  ctx: ScoreContext = {},
+): Stop | null {
+  const planIds = new Set(plan.map((s) => s.id));
+  const ordered = [...plan].sort((a, b) => a.alongKm - b.alongKm);
+  let windowStart = 0;
+  let windowEnd = Infinity;
+  if (ordered.length >= 2) {
+    let bestGap = 0;
+    for (let i = 0; i < ordered.length - 1; i++) {
+      const gap = ordered[i + 1].alongKm - ordered[i].alongKm;
+      if (gap > bestGap) {
+        bestGap = gap;
+        windowStart = ordered[i].alongKm;
+        windowEnd = ordered[i + 1].alongKm;
+      }
+    }
+  } else if (ordered.length === 1) {
+    windowStart = ordered[0].alongKm - 30;
+    windowEnd = ordered[0].alongKm + 30;
+  }
+
+  let best: Stop | null = null;
+  let bestScore = 0;
+  for (const s of allStops) {
+    if (planIds.has(s.id)) continue;
+    if (s.alongKm < windowStart || s.alongKm > windowEnd) continue;
+    const sc = pithopScore(s, prefs, ctx).score;
+    if (sc > bestScore) {
+      bestScore = sc;
+      best = s;
+    }
+  }
+  return best;
+}
