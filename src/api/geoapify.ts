@@ -233,6 +233,15 @@ export async function fetchGeoapifyLodging(near: LatLng, radiusM = 20000, limit 
 // 'catering'. That lets the wider set (EV charging, sights, parks, nature)
 // be attempted without risking total loss of coverage if a slug is retired.
 const ROADSIDE_TIERS = [
+  // Richest tier: everything below, plus the ticketed indoor places. These
+  // entertainment.* names are NOT verified against a live key, so this tier is
+  // additive on purpose — Geoapify rejects an unknown category outright, and
+  // the loop below then falls to the next tier, which is exactly the set that
+  // was requested before. A wrong name here costs nothing but the extra places.
+  'catering.restaurant,catering.cafe,catering.fast_food,catering.ice_cream,' +
+    'service.vehicle.fuel,service.vehicle.charging_station,' +
+    'tourism.attraction,tourism.sights,leisure.park,natural,' +
+    'entertainment.museum,entertainment.zoo,entertainment.aquarium,entertainment.theme_park,entertainment.culture.gallery',
   'catering.restaurant,catering.cafe,catering.fast_food,catering.ice_cream,' +
     'service.vehicle.fuel,service.vehicle.charging_station,' +
     'tourism.attraction,tourism.sights,leisure.park,natural',
@@ -240,7 +249,8 @@ const ROADSIDE_TIERS = [
   'catering',
 ];
 
-function categorizeGeoapify(cats: string[]): { category: CategoryId; kind: string } | null {
+// Exported for tests: see the note on categorizeOsm.
+export function categorizeGeoapify(cats: string[]): { category: CategoryId; kind: string } | null {
   const has = (c: string) => cats.some((x) => x === c || x.startsWith(c + '.'));
   if (has('service.vehicle.fuel')) return { category: 'rest', kind: 'fuel' };
   if (has('service.vehicle.charging_station')) return { category: 'rest', kind: 'charging_station' };
@@ -256,6 +266,17 @@ function categorizeGeoapify(cats: string[]): { category: CategoryId; kind: strin
   }
   if (has('leisure.park')) return { category: 'nature', kind: 'park' };
   if (has('natural')) return { category: 'views', kind: 'viewpoint' };
+  // Ticketed indoor places, checked ahead of the tourism branches below: a
+  // museum usually carries tourism.sights (or tourism.attraction) as well, and
+  // the generic branch would otherwise flatten it to "attraction" — losing the
+  // 90-minute visit estimate, the museum copy and the ticket link. These are
+  // read whichever tier succeeded, since Geoapify returns a place's full
+  // category list regardless of which categories were requested.
+  if (has('entertainment.museum')) return { category: 'museums', kind: 'museum' };
+  if (has('entertainment.culture.gallery')) return { category: 'museums', kind: 'gallery' };
+  if (has('entertainment.zoo')) return { category: 'fun', kind: 'zoo' };
+  if (has('entertainment.aquarium')) return { category: 'fun', kind: 'aquarium' };
+  if (has('entertainment.theme_park')) return { category: 'fun', kind: 'theme_park' };
   if (has('tourism.sights')) return { category: 'history', kind: 'historic_site' };
   if (has('tourism')) return { category: 'fun', kind: 'attraction' };
   return null;
