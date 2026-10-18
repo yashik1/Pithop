@@ -3,12 +3,19 @@
 -- Safe to re-run: every statement is guarded.
 --
 -- WHICH PROJECT THIS BELONGS TO
--- This was first applied to project sufknfpyiynqstplrkqd, which is NOT
--- necessarily the one the live site talks to. The project the app actually uses
--- is whichever ref appears in VITE_SUPABASE_URL (the subdomain of
--- https://<ref>.supabase.co IS the project ref) — check that before applying
--- this anywhere. Applying it to the wrong project is harmless but useless: trip
--- sync fails against the project the client is pointed at, with no table there.
+-- The live site connects to ystolaygiguimbhmuigj. Confirmed by reading the
+-- deployed bundle itself: VITE_SUPABASE_URL is inlined at build time, so the
+-- URL the client uses is a literal string in the shipped JavaScript. That is
+-- the only check worth trusting — the dashboard will not show the value back
+-- (it is marked Sensitive), and this repo is also linked to that project
+-- through Supabase's GitHub integration, which is suggestive but is not the
+-- same thing as what the client connects to.
+--
+-- There is a second, OLDER project, sufknfpyiynqstplrkqd, which this migration
+-- was first applied to by mistake. It also has the trips table and its four
+-- policies, and it is not used by anything. Running this against that project
+-- does nothing useful, and — because the schema is identical — the
+-- verification below passes there too. So confirm the ref before applying.
 --
 -- Anonymous visitors are unaffected — they keep using localStorage, exactly as
 -- before. This table only backs cross-device sync for people who sign in.
