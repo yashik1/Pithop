@@ -1,11 +1,29 @@
 -- Pithop: saved trips for signed-in travellers.
 --
--- Already applied to the Side-quest project (sufknfpyiynqstplrkqd). Kept here so
--- the schema is versioned with the code and can be recreated from scratch.
 -- Safe to re-run: every statement is guarded.
+--
+-- WHICH PROJECT THIS BELONGS TO
+-- The live site connects to ystolaygiguimbhmuigj. Confirmed by reading the
+-- deployed bundle itself: VITE_SUPABASE_URL is inlined at build time, so the
+-- URL the client uses is a literal string in the shipped JavaScript. That is
+-- the only check worth trusting — the dashboard will not show the value back
+-- (it is marked Sensitive), and this repo is also linked to that project
+-- through Supabase's GitHub integration, which is suggestive but is not the
+-- same thing as what the client connects to.
+--
+-- There is a second, OLDER project, sufknfpyiynqstplrkqd, which this migration
+-- was first applied to by mistake. It also has the trips table and its four
+-- policies, and it is not used by anything. Running this against that project
+-- does nothing useful, and — because the schema is identical — the
+-- verification below passes there too. So confirm the ref before applying.
 --
 -- Anonymous visitors are unaffected — they keep using localStorage, exactly as
 -- before. This table only backs cross-device sync for people who sign in.
+--
+-- VERIFY AFTER APPLYING. A migration run against a project that is still waking
+-- from pause can report success and then be rolled back by the restore that
+-- lands afterwards. Do not trust the "Success" message on its own — run the
+-- verification query at the bottom of this file and read the result.
 
 create extension if not exists "pgcrypto";
 
@@ -93,3 +111,21 @@ drop policy if exists "trips are deletable by their owner" on public.trips;
 create policy "trips are deletable by their owner"
   on public.trips for delete to authenticated
   using ((select auth.uid()) = user_id);
+
+-- ---------------------------------------------------------------------------
+-- Verification. Run this separately after applying, and read the output rather
+-- than trusting the editor's "Success". Expect exactly: rls_enabled = true and
+-- policy_count = 4. Anything else means the migration did not stick.
+--
+--   select
+--     c.relname                                             as table_name,
+--     c.relrowsecurity                                      as rls_enabled,
+--     (select count(*) from pg_policies p
+--       where p.schemaname = 'public' and p.tablename = 'trips') as policy_count
+--   from pg_class c
+--   join pg_namespace n on n.oid = c.relnamespace
+--   where n.nspname = 'public' and c.relname = 'trips';
+--
+-- A table with rls_enabled = false is worse than no table at all: every row
+-- would be readable by any client holding the anon key.
+-- ---------------------------------------------------------------------------
