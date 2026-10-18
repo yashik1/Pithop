@@ -14,7 +14,7 @@ import {
 } from './api/community';
 import type { Stop } from './types';
 import { CATEGORIES, CATEGORY_MAP, thingsToDo, type CategoryId } from './lib/categories';
-import { anyAffiliate, gasCashbackLink, hotelsLink, ticketsLink } from './lib/affiliates';
+import { anyAffiliate, gasCashbackLink, hotelsLink, ticketLinks } from './lib/affiliates';
 import { getThemeMode, setThemeMode, type ThemeMode } from './lib/theme';
 import { consumeAuthErrorFromUrl, getUser, hasAuth, signOut, subscribe, type AuthUser } from './lib/auth';
 import { AuthPanel } from './components/AuthPanel';
@@ -2464,11 +2464,17 @@ export default function App() {
                             <p className="stop-by">👤 {t('addedBy', { name: s.by })}</p>
                           )}
                           <div className="stop-links" onClick={(e) => e.stopPropagation()}>
-                            {ticketsLink(s.name, s.kind) && (
-                              <a className="aff" href={ticketsLink(s.name, s.kind)!} target="_blank" rel="sponsored noreferrer">
-                                🎟️ {t('bookTickets')} ↗
+                            {ticketLinks(s.name, s.kind).map((link) => (
+                              <a
+                                key={link.partner}
+                                className="aff"
+                                href={link.url}
+                                target="_blank"
+                                rel="sponsored noreferrer"
+                              >
+                                🎟️ {t('bookTickets')} · {link.label} ↗
                               </a>
-                            )}
+                            ))}
                             {s.category === 'rest' && gasCashbackLink() && (
                               <a className="aff" href={gasCashbackLink()!} target="_blank" rel="sponsored noreferrer">
                                 ⛽ {t('gasCashback')} ↗

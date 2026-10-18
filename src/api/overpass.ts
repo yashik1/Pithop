@@ -9,6 +9,11 @@ const ENDPOINTS = ['https://overpass-api.de/api/interpreter', 'https://overpass.
 
 const FOOD_KINDS = ['restaurant', 'cafe', 'fast_food', 'ice_cream'];
 
+// OSM tourism values that are ticketed places worth a detour. Kept in step with
+// the regex in buildQuery below — querying a tag nothing categorizes (or
+// categorizing one nothing queries) silently does nothing.
+const TICKETED_TOURISM = ['museum', 'gallery', 'zoo', 'aquarium', 'theme_park'];
+
 interface OverpassElement {
   type: string;
   id: number;
@@ -22,12 +27,19 @@ interface OverpassElement {
 // so dense stretches aren't truncated. They stay deliberately short of the full
 // corridor for food/fuel — those are the highest-density tags, and the public
 // Overpass servers start timing out when their discs grow much past this.
-function buildQuery(samples: LatLng[]): string {
+export function buildQuery(samples: LatLng[]): string {
   let body = '';
   for (const p of samples) {
     const pt = `${p.lat.toFixed(4)},${p.lng.toFixed(4)}`;
     body += `node["tourism"="viewpoint"](around:10000,${pt});`;
     body += `node["tourism"="picnic_site"](around:8000,${pt});`;
+    // Ticketed indoor places. Wikipedia only covers the ones notable enough to
+    // have an article, which misses most local museums and galleries entirely.
+    // Named-only, and `way` as well as `node` because these are nearly always
+    // mapped as a building outline rather than a point. They are far sparser
+    // than food or fuel, so a wide disc costs little.
+    body += `node["tourism"~"^(museum|gallery|zoo|aquarium|theme_park)$"]["name"](around:10000,${pt});`;
+    body += `way["tourism"~"^(museum|gallery|zoo|aquarium|theme_park)$"]["name"](around:10000,${pt});`;
     body += `node["amenity"~"^(restaurant|cafe|fast_food|ice_cream)$"]["name"](around:4500,${pt});`;
     body += `node["highway"~"^(rest_area|services)$"](around:10000,${pt});`;
     body += `way["highway"~"^(rest_area|services)$"](around:10000,${pt});`;
@@ -124,12 +136,25 @@ export function describeOsm(tags: Record<string, string>, kind: string): string 
   return parts.length ? parts.join(' · ') : undefined;
 }
 
-function categorizeOsm(tags: Record<string, string>): { category: CategoryId; kind: string; name: string } | null {
+// Exported for tests: which OSM tags become which kind is the whole contract
+// between this file and the ticket links in lib/affiliates.
+export function categorizeOsm(tags: Record<string, string>): { category: CategoryId; kind: string; name: string } | null {
   // Coerce tag values — OSM data occasionally yields non-string names, which
   // must not crash string handling downstream.
   const tagName = tags.name != null ? String(tags.name) : undefined;
   if (tags.tourism === 'viewpoint') {
     return { category: 'views', kind: 'viewpoint', name: tagName ?? 'Scenic viewpoint' };
+  }
+  // The OSM tourism value doubles as the stop kind: museum, gallery, zoo,
+  // aquarium and theme_park all already have visit times and "things to do"
+  // copy in lib/categories, and all are ticketed. The query requires a name,
+  // so tagName is present — the fallback is belt and braces.
+  if (TICKETED_TOURISM.includes(tags.tourism)) {
+    return {
+      category: tags.tourism === 'museum' || tags.tourism === 'gallery' ? 'museums' : 'fun',
+      kind: tags.tourism,
+      name: tagName ?? 'Attraction',
+    };
   }
   if (tags.amenity && FOOD_KINDS.includes(tags.amenity) && tagName) {
     return { category: 'food', kind: tags.amenity, name: tagName };
