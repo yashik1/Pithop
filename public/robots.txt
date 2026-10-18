@@ -8,8 +8,22 @@ Allow: /
 # and a sign-in fragment in a search result would be both useless and confusing.
 Disallow: /auth-popup.html
 
-# Hashed build assets are not pages. Excluding them keeps crawl budget on
-# content without hiding anything Google needs to render the app.
-Disallow: /assets/
+# /assets/ MUST STAY CRAWLABLE. It was disallowed here on the reasoning that
+# hashed build output is "not pages" and excluding it saves crawl budget. Both
+# halves of that were wrong, and it is the one rule that can quietly break
+# indexing for this app:
+#
+#   - Pithop is client-rendered, and its entire bundle — index-*.js and
+#     index-*.css — is served from /assets/. Blocking the directory stops
+#     Googlebot fetching them, so it renders the page with no stylesheet and no
+#     application. Google's own guidance is not to disallow CSS or JS for
+#     exactly this reason: the crawler has to see what a visitor sees, and a
+#     page it cannot style also cannot be judged mobile-friendly.
+#   - Crawl budget is not a constraint at four URLs. It is a concern for sites
+#     with hundreds of thousands of pages, not this one.
+#
+# The static landing in index.html means the site was never invisible — which
+# is presumably how it got indexed elsewhere — but Google was being shown a
+# deliberately crippled version of it.
 
 Sitemap: https://pithop.com/sitemap.xml

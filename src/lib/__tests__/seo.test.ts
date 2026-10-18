@@ -85,6 +85,24 @@ describe('crawler-facing files', () => {
     expect(robots).toContain('Sitemap: https://pithop.com/sitemap.xml');
   });
 
+  // The app is client-rendered and its whole bundle lives under /assets/, so
+  // disallowing that directory leaves a crawler rendering the page with no
+  // stylesheet and no application. It was disallowed once; this stops it
+  // coming back, and is checked against the directory the build really emits
+  // rather than a hardcoded path.
+  it('lets crawlers fetch the JavaScript and CSS the page needs to render', () => {
+    // Where the build puts the bundle. vite.config.ts sets no assetsDir, so
+    // this is Vite's default; if that is ever overridden, update it here too.
+    const bundles = ['/assets/index-abc123.js', '/assets/index-abc123.css'];
+    const disallowed = [...robots.matchAll(/^Disallow:\s*(\S+)/gm)].map((m) => m[1]);
+
+    for (const rule of disallowed) {
+      for (const bundle of bundles) {
+        expect(bundle.startsWith(rule), `robots.txt rule "${rule}" blocks ${bundle}`).toBe(false);
+      }
+    }
+  });
+
   it('lists only indexable pages in the sitemap', () => {
     // Asking Google to index a page that refuses to be indexed is the mistake
     // this guards — it is what produced the "Discovered - currently not
