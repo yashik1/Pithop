@@ -15,6 +15,7 @@ import {
 import type { Stop } from './types';
 import { CATEGORIES, CATEGORY_MAP, thingsToDo, type CategoryId } from './lib/categories';
 import { anyAffiliate, gasCashbackLink, hotelsLink, ticketLinks } from './lib/affiliates';
+import { ROUTE_GUIDES } from './lib/guides';
 import { getThemeMode, setThemeMode, type ThemeMode } from './lib/theme';
 import { consumeAuthErrorFromUrl, getUser, hasAuth, signOut, subscribe, type AuthUser } from './lib/auth';
 import { AuthPanel } from './components/AuthPanel';
@@ -2570,6 +2571,27 @@ export default function App() {
                 Austin → Dallas
               </button>
             </p>
+          </div>
+        )}
+
+        {/* Route guides, shown only before a search: this is the "ideas before
+            you start" moment, and they would be clutter once someone has a
+            route of their own. They open in a new tab so a half-typed trip
+            survives the detour — half of visitors are on a phone, where
+            navigating away and back is the easy way to lose it.
+
+            English only, because the guides are English pages about Ontario;
+            offering them under a Spanish or Japanese UI would be noise. Lift
+            this condition when the guides are translated. */}
+        {!route && !busy && lang === 'en' && (
+          <div className="guides">
+            <h2>🗺️ Popular Ontario routes</h2>
+            {ROUTE_GUIDES.map((g) => (
+              <a key={g.href} className="guide-item" href={g.href} target="_blank" rel="noopener">
+                <span className="guide-name">{g.label} ↗</span>
+                <span className="guide-blurb">{g.blurb}</span>
+              </a>
+            ))}
           </div>
         )}
         <footer className="foot">

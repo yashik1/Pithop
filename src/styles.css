@@ -1483,6 +1483,55 @@ body {
   background: rgba(214, 69, 69, 0.1);
 }
 
+/* Route guides in the empty state. Deliberately the same card and heading
+   treatment as saved trips above: both are "somewhere to start" rather than
+   part of the search form, and making them look alike keeps the panel from
+   reading as a pile of unrelated boxes. */
+.guides {
+  margin: 12px 14px 0;
+  padding: 14px 16px 10px;
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-1);
+  animation: rise-in 0.35s var(--ease-out) backwards;
+}
+
+.guides h2 {
+  margin: 0 0 4px;
+  font-size: 11.5px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--ink-3);
+}
+
+.guide-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 10px;
+  margin-left: -10px;
+  border-radius: 10px;
+  text-decoration: none;
+  transition: background 0.15s var(--ease-out);
+}
+
+.guide-item:hover {
+  background: rgba(37, 99, 235, 0.08);
+}
+
+.guide-name {
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--primary);
+}
+
+.guide-blurb {
+  font-size: 12px;
+  color: var(--ink-3);
+}
+
 /* ---------- Empty state ---------- */
 
 .hint {
