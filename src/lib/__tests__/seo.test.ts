@@ -133,10 +133,13 @@ const guides = Object.entries(pages).filter(([path]) => path.startsWith('guides/
 
 /** The JSON-LD nodes on a page, flattened out of @graph. */
 function nodes(src: string): Array<Record<string, any>> {
-  const m = /<script type="application\/ld\+json">([\s\S]*?)<\/script>/.exec(src);
-  if (!m) return [];
-  const data = JSON.parse(m[1]);
-  return data['@graph'] ?? [data];
+  // matchAll, not exec: a second JSON-LD block would otherwise be read as absent.
+  return [...src.matchAll(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/g)].flatMap(
+    (m) => {
+      const data = JSON.parse(m[1]); // a malformed block throws here, which is the assertion
+      return data['@graph'] ?? [data];
+    },
+  );
 }
 
 const node = (src: string, type: string) => nodes(src).find((n) => n['@type'] === type);
@@ -196,5 +199,38 @@ describe('route guides', () => {
     for (const q of node(src, 'FAQPage')!.mainEntity) {
       expect(q.name.trim().endsWith('?'), `not a question: ${q.name}`).toBe(true);
     }
+  });
+});
+
+describe('route guide content, beyond the markup', () => {
+  // The audit reported this on one page, so it was fixed on one page — but the
+  // gap was structural and present on all three. Its check only fired where the
+  // h2 happened to be question-shaped already.
+  it.each(guides)('%s answers the heading above its Q&A grid', (_path, src) => {
+    expect(src, 'a grid of questions needs a short answer under its h2').not.toMatch(
+      /<\/h2>\s*<div class="grid">/,
+    );
+  });
+
+  // Two pages answering the same question differently leaves an answer engine
+  // to pick one arbitrarily.
+  it('asks each question on only one guide', () => {
+    const asked = new Map<string, string>();
+    for (const [path, src] of guides) {
+      for (const q of node(src, 'FAQPage')!.mainEntity) {
+        expect(asked.has(q.name), `"${q.name}" is also asked on ${asked.get(q.name)}`).toBe(false);
+        asked.set(q.name, path);
+      }
+    }
+  });
+
+  // Catches an inverted range or a date in the future. It cannot catch a date
+  // that is merely stale — nothing in the file knows when the file last changed
+  // — so keeping dateModified honest stays a matter of changing it when you
+  // change the page.
+  it.each(guides)('%s claims a date it could plausibly have', (_path, src) => {
+    const a = node(src, 'Article')!;
+    expect(a.dateModified >= a.datePublished).toBe(true); // ISO dates sort as strings
+    expect(a.dateModified <= new Date().toISOString().slice(0, 10)).toBe(true);
   });
 });
