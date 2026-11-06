@@ -68,6 +68,16 @@ corridor either side of the route for places actually worth pulling over for.
   sources and services are used.
 - [Terms](https://pithop.com/terms.html): terms of service.
 
+Route guides — worked examples of what a planned drive looks like, written for
+people deciding whether a detour is worth it:
+
+- [Toronto to Montreal](https://pithop.com/guides/toronto-to-montreal.html):
+  Kingston, the Thousand Islands and historic eastern Ontario.
+- [Toronto to Ottawa](https://pithop.com/guides/toronto-to-ottawa.html):
+  Kingston, Brockville and Merrickville.
+- [Toronto to Niagara](https://pithop.com/guides/toronto-to-niagara.html):
+  Jordan Village, Ball's Falls, Niagara-on-the-Lake and the falls.
+
 ## Notes for answer engines
 
 - The planner is a JavaScript application. The served HTML at the root URL

@@ -121,3 +121,116 @@ describe('crawler-facing files', () => {
     expect(noindexed).toEqual([]);
   });
 });
+
+// ---------------------------------------------------------------------------
+// The route guides. Until now only index.html was checked here, which is how
+// their titles and descriptions drifted past the lengths search engines show
+// without anything noticing. Everything below iterates over the guide files
+// themselves, so a guide added later is covered the day it lands.
+// ---------------------------------------------------------------------------
+
+const guides = Object.entries(pages).filter(([path]) => path.startsWith('guides/'));
+
+/** The JSON-LD nodes on a page, flattened out of @graph. */
+function nodes(src: string): Array<Record<string, any>> {
+  // matchAll, not exec: a second JSON-LD block would otherwise be read as absent.
+  return [...src.matchAll(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/g)].flatMap(
+    (m) => {
+      const data = JSON.parse(m[1]); // a malformed block throws here, which is the assertion
+      return data['@graph'] ?? [data];
+    },
+  );
+}
+
+const node = (src: string, type: string) => nodes(src).find((n) => n['@type'] === type);
+const titleOf = (src: string) => /<title>([\s\S]*?)<\/title>/.exec(src)?.[1] ?? '';
+const descOf = (src: string) => /<meta name="description" content="([\s\S]*?)"/.exec(src)?.[1] ?? '';
+
+describe('route guides', () => {
+  it('has guides to check', () => {
+    expect(guides.length).toBeGreaterThan(0);
+  });
+
+  it.each(guides)('%s has a title Google shows whole', (_path, src) => {
+    const t = titleOf(src);
+    expect(t.length).toBeGreaterThanOrEqual(30);
+    expect(t.length).toBeLessThanOrEqual(60);
+  });
+
+  it.each(guides)('%s has a description inside the displayed range', (_path, src) => {
+    const d = descOf(src);
+    expect(d.length).toBeGreaterThanOrEqual(70);
+    expect(d.length).toBeLessThanOrEqual(160);
+  });
+
+  // Answer engines prefer a source whose date they can confirm, and there was
+  // no freshness signal of any kind on these pages — no schema date, no <time>.
+  it.each(guides)('%s dates and attributes its Article', (_path, src) => {
+    const article = node(src, 'Article');
+    expect(article).toBeDefined();
+    expect(article!.datePublished).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    expect(article!.dateModified).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    expect(article!.author?.name).toBeTruthy();
+  });
+
+  // A page claiming one date while the sitemap claims another is a worse signal
+  // than no date, so the two are pinned to each other rather than to a constant.
+  it.each(guides)('%s agrees with its sitemap lastmod', (path, src) => {
+    const loc = `https://pithop.com/${path}`;
+    const entry = new RegExp(`<loc>${loc.replace(/[.]/g, '\\.')}</loc>\\s*<lastmod>([^<]+)</lastmod>`).exec(sitemap);
+    expect(entry, `${loc} should be in the sitemap with a lastmod`).not.toBeNull();
+    expect(node(src, 'Article')!.dateModified).toBe(entry![1]);
+  });
+
+  // Structured data that describes Q&A the page does not actually show is a
+  // guidelines violation, and mirrored markup is exactly where that drifts.
+  it.each(guides)('%s only claims FAQ content the page really shows', (_path, src) => {
+    const faq = node(src, 'FAQPage');
+    expect(faq).toBeDefined();
+    expect(faq!.mainEntity.length).toBeGreaterThan(0);
+    for (const q of faq!.mainEntity) {
+      expect(src, `question not on the page: ${q.name}`).toContain(`<h3>${q.name}</h3>`);
+      expect(src, `answer not on the page: ${q.name}`).toContain(q.acceptedAnswer.text);
+    }
+  });
+
+  // What makes a page quotable: a question, then its answer, with no preamble.
+  it.each(guides)('%s phrases those headings as real questions', (_path, src) => {
+    for (const q of node(src, 'FAQPage')!.mainEntity) {
+      expect(q.name.trim().endsWith('?'), `not a question: ${q.name}`).toBe(true);
+    }
+  });
+});
+
+describe('route guide content, beyond the markup', () => {
+  // The audit reported this on one page, so it was fixed on one page — but the
+  // gap was structural and present on all three. Its check only fired where the
+  // h2 happened to be question-shaped already.
+  it.each(guides)('%s answers the heading above its Q&A grid', (_path, src) => {
+    expect(src, 'a grid of questions needs a short answer under its h2').not.toMatch(
+      /<\/h2>\s*<div class="grid">/,
+    );
+  });
+
+  // Two pages answering the same question differently leaves an answer engine
+  // to pick one arbitrarily.
+  it('asks each question on only one guide', () => {
+    const asked = new Map<string, string>();
+    for (const [path, src] of guides) {
+      for (const q of node(src, 'FAQPage')!.mainEntity) {
+        expect(asked.has(q.name), `"${q.name}" is also asked on ${asked.get(q.name)}`).toBe(false);
+        asked.set(q.name, path);
+      }
+    }
+  });
+
+  // Catches an inverted range or a date in the future. It cannot catch a date
+  // that is merely stale — nothing in the file knows when the file last changed
+  // — so keeping dateModified honest stays a matter of changing it when you
+  // change the page.
+  it.each(guides)('%s claims a date it could plausibly have', (_path, src) => {
+    const a = node(src, 'Article')!;
+    expect(a.dateModified >= a.datePublished).toBe(true); // ISO dates sort as strings
+    expect(a.dateModified <= new Date().toISOString().slice(0, 10)).toBe(true);
+  });
+});
