@@ -104,7 +104,7 @@ function parseShareHash(): { fromText: string; toText: string; viaTexts: string[
   }
 }
 import { cumulativeKm, haversineKm, projectOntoRoute, sampleAlong, simplify, type LatLng } from './lib/geo';
-import { distValue, fmtDist, fmtDur, type Units } from './lib/format';
+import { clockTime, distValue, fmtDist, fmtDur, type Units } from './lib/format';
 import { getUnits, setUnits } from './lib/units';
 import { MapView, type LivePos } from './MapView';
 import { shareTripUrl } from './lib/export';
@@ -1373,7 +1373,7 @@ export default function App() {
       const meal =
         mins >= 680 && mins <= 830 ? 'mealLunch' : mins >= 1040 && mins <= 1180 ? 'mealDinner' : null;
       if (meal) {
-        out.set(s.id, { clock: eta.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }), meal });
+        out.set(s.id, { clock: clockTime(eta), meal });
       }
     }
     return out;
@@ -2399,7 +2399,7 @@ export default function App() {
                 const avgKmh =
                   route && route.durationMin > 0 ? route.distanceKm / (route.durationMin / 60) : 70;
                 const eta = new Date(Date.now() + (s.alongKm / avgKmh) * 3600_000);
-                const etaClock = eta.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                const etaClock = clockTime(eta);
                 const hs = hoursStatus(s.hours, eta);
                 return (
                   <div

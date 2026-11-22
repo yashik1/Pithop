@@ -8,12 +8,12 @@
 import type { Stop } from '../types';
 import type { Itinerary, ItineraryDay, ItineraryWarning } from '../lib/itinerary';
 import { CATEGORY_MAP } from '../lib/categories';
-import { fmtDur, type Units, distValue } from '../lib/format';
+import { clockTime, distValue, fmtDur, type Units } from '../lib/format';
 import { t } from '../lib/i18n';
 
 const VISIT_CHOICES = [10, 15, 30, 45, 60, 90, 120, 180];
 
-const clock = (d: Date) => d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+const clock = clockTime;
 const dayLabel = (d: Date) => d.toLocaleDateString([], { weekday: 'long', month: 'short', day: 'numeric' });
 
 interface Props {

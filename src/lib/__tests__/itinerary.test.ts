@@ -1,5 +1,12 @@
 import { describe, it, expect } from 'vitest';
-import { buildItinerary, defaultDeparture, type ItineraryOptions } from '../itinerary';
+import {
+  arrivalIndex,
+  buildItinerary,
+  defaultDeparture,
+  timeAtFrac,
+  timelineAnchors,
+  type ItineraryOptions,
+} from '../itinerary';
 import type { Stop } from '../../types';
 
 // A 600 km / 600 min route: exactly 1 minute per km, which keeps the arithmetic
@@ -188,5 +195,50 @@ describe('defaultDeparture', () => {
     const d = defaultDeparture(new Date('2026-04-10T15:30:00'));
     expect(hhmm(d)).toBe('08:00');
     expect(d.getDate()).toBe(11);
+  });
+});
+
+describe('reading times back out', () => {
+  it('indexes every stop across every day, and nothing else', () => {
+    const it = buildItinerary([stop('a', 100), stop('b', 500)], base);
+    const idx = arrivalIndex(it);
+    expect([...idx.keys()].sort()).toEqual(['a', 'b']);
+    expect(hhmm(idx.get('a')!)).toBe(hhmm(it.days[0].stops[0].arrive));
+  });
+
+  it('interpolates a position between two stops', () => {
+    const it = buildItinerary([stop('a', 120), stop('b', 360)], base);
+    const anchors = timelineAnchors(it, 600);
+    // Halfway between a's departure (10:30) and b's arrival (14:30).
+    expect(hhmm(timeAtFrac(anchors, 240 / 600))).toBe('12:30');
+  });
+
+  it('answers the endpoints with the real departure and arrival', () => {
+    const it = buildItinerary([stop('a', 300)], base);
+    const anchors = timelineAnchors(it, 600);
+    expect(hhmm(timeAtFrac(anchors, 0))).toBe('08:00');
+    expect(timeAtFrac(anchors, 1).getTime()).toBe(it.arriveAt.getTime());
+  });
+
+  // The trap this exists for: somewhere just past an overnight stop is reached
+  // the NEXT MORNING, not late the same night. Linear time against distance
+  // would put it in the small hours and forecast the wrong half of the day.
+  it('carries a position past an overnight break into the next morning', () => {
+    // 6 h driving cap, so a stop at 500 km forces a night before the finish.
+    const it = buildItinerary([stop('a', 300), stop('b', 500)], base);
+    expect(it.days.length).toBeGreaterThan(1);
+    const anchors = timelineAnchors(it, 600);
+
+    const overnightAt = it.days[0].stops[it.days[0].stops.length - 1].stop.alongKm;
+    const justPast = timeAtFrac(anchors, (overnightAt + 1) / 600);
+    expect(justPast.getDate()).toBe(it.days[1].departAt.getDate());
+    expect(justPast.getHours()).toBeGreaterThanOrEqual(8);
+  });
+
+  it('treats a trip with no stops as a straight run to the destination', () => {
+    const it = buildItinerary([], base);
+    const anchors = timelineAnchors(it, 600);
+    expect(hhmm(timeAtFrac(anchors, 0))).toBe('08:00');
+    expect(hhmm(timeAtFrac(anchors, 0.5))).toBe('13:00'); // 300 km at 1 min/km
   });
 });
