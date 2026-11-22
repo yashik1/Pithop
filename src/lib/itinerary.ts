@@ -210,3 +210,88 @@ export function buildItinerary(plan: Stop[], opts: ItineraryOptions): Itinerary 
 export function defaultDeparture(now: Date = new Date()): Date {
   return nextMorning(now, 8 * 60);
 }
+
+// ---------------------------------------------------------------------------
+// Reading times back out of a built itinerary.
+//
+// These exist because the rest of the app keeps estimating arrival times from
+// Date.now(), while the itinerary knows the real answer: departure is tomorrow
+// at 08:00 by default, so "now" is the wrong clock for anything scheduled.
+// Pure — they read only the itinerary handed to them.
+// ---------------------------------------------------------------------------
+
+/** Flat stop id -> arrival time. The days/stops nesting is awkward to index
+ *  into from a component that has only a Stop in hand. */
+export function arrivalIndex(it: Itinerary): Map<string, Date> {
+  const out = new Map<string, Date>();
+  for (const day of it.days) {
+    for (const s of day.stops) out.set(s.stop.id, s.arrive);
+  }
+  return out;
+}
+
+/** A point on the trip's timeline: how far along the route, and when. */
+export interface TimeAnchor {
+  /** Fraction of the route, 0 at the start and 1 at the destination. */
+  frac: number;
+  t: Date;
+}
+
+/**
+ * The trip as (position, time) pairs, for working out when the traveller is
+ * somewhere that isn't a stop.
+ *
+ * `totalKm` must be measured the same way as `Stop.alongKm` — that is, against
+ * the simplified geometry the stops were projected onto, not the router's
+ * stated distance. The two differ slightly and mixing them skews every lookup.
+ *
+ * An overnight break produces two anchors at the same position: the evening
+ * the traveller stops, and the morning they set off again. That is what makes
+ * somewhere just past an overnight read as the next morning rather than as
+ * the small hours.
+ */
+export function timelineAnchors(it: Itinerary, totalKm: number): TimeAnchor[] {
+  const span = totalKm > 0 ? totalKm : 1;
+  const out: TimeAnchor[] = [];
+  if (it.days.length > 0) out.push({ frac: 0, t: it.days[0].departAt });
+
+  it.days.forEach((day, i) => {
+    for (const s of day.stops) {
+      const frac = Math.min(1, Math.max(0, s.stop.alongKm / span));
+      out.push({ frac, t: s.arrive });
+      out.push({ frac, t: s.depart });
+    }
+    // Sleeping here: time jumps to the next morning without moving.
+    const next = it.days[i + 1];
+    if (next && day.stops.length > 0) {
+      const last = day.stops[day.stops.length - 1];
+      out.push({ frac: Math.min(1, Math.max(0, last.stop.alongKm / span)), t: next.departAt });
+    }
+  });
+
+  out.push({ frac: 1, t: it.arriveAt });
+  return out;
+}
+
+/** When the traveller reaches a fraction of the route. Interpolates between
+ *  anchors; where several share a position, the latest wins, so a query at an
+ *  overnight stop answers with the morning departure. */
+export function timeAtFrac(anchors: TimeAnchor[], frac: number): Date {
+  if (anchors.length === 0) return new Date(0);
+  const f = Math.min(1, Math.max(0, frac));
+
+  let i = -1;
+  for (let k = 0; k < anchors.length; k++) {
+    if (anchors[k].frac <= f) i = k;
+  }
+  if (i < 0) return anchors[0].t;
+  if (i >= anchors.length - 1) return anchors[anchors.length - 1].t;
+  if (anchors[i].frac === f) return anchors[i].t;
+
+  const a = anchors[i];
+  const b = anchors[i + 1];
+  const width = b.frac - a.frac;
+  if (width <= 0) return b.t;
+  const ratio = (f - a.frac) / width;
+  return new Date(a.t.getTime() + ratio * (b.t.getTime() - a.t.getTime()));
+}

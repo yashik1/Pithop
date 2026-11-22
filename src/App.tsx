@@ -16,12 +16,26 @@ import type { Stop } from './types';
 import { CATEGORIES, CATEGORY_MAP, thingsToDo, type CategoryId } from './lib/categories';
 import { anyAffiliate, gasCashbackLink, hotelsLink, ticketLinks } from './lib/affiliates';
 import { ROUTE_GUIDES } from './lib/guides';
+import { fetchWeather, hasWeather } from './api/weather';
+import {
+  cellFor,
+  hourAt,
+  iconOf,
+  kindOf,
+  mergeCells,
+  routeCells,
+  severity,
+  type WxCell,
+  type WxGrid,
+  type WxHour,
+  type WxVerdict,
+} from './lib/weather';
 import { getThemeMode, setThemeMode, type ThemeMode } from './lib/theme';
 import { consumeAuthErrorFromUrl, getUser, hasAuth, signOut, subscribe, type AuthUser } from './lib/auth';
 import { AuthPanel } from './components/AuthPanel';
 import { ItineraryView } from './components/Itinerary';
-import { buildItinerary, defaultDeparture } from './lib/itinerary';
-import { catLabel, getLang, LANGUAGES, setLang, t, type Lang } from './lib/i18n';
+import { arrivalIndex, buildItinerary, defaultDeparture } from './lib/itinerary';
+import { catLabel, getLang, LANGUAGES, setLang, t, type Lang, type TKey } from './lib/i18n';
 import { getVehicle, setVehicle, VEHICLES, VEHICLE_MAP, type Vehicle } from './lib/vehicle';
 import {
   bingoLineCount,
@@ -104,11 +118,43 @@ function parseShareHash(): { fromText: string; toText: string; viaTexts: string[
   }
 }
 import { cumulativeKm, haversineKm, projectOntoRoute, sampleAlong, simplify, type LatLng } from './lib/geo';
-import { distValue, fmtDist, fmtDur, type Units } from './lib/format';
-import { getUnits, setUnits } from './lib/units';
+import { clockTime, distValue, fmtDist, fmtDur, fmtTemp, type TempUnit, type Units } from './lib/format';
+import { getTempUnit, getUnits, setTempUnit, setUnits } from './lib/units';
 import { MapView, type LivePos } from './MapView';
 import { shareTripUrl } from './lib/export';
 import { PlaceInput } from './components/PlaceInput';
+
+// Weather in one line: what it will be doing, and how much that matters to
+// someone travelling this way. The severity class tints it; the reasons are
+// codes from lib/weather, translated here so that module stays language-free.
+const WX_REASON_KEY: Record<string, TKey> = {
+  ice: 'wxIce', snow: 'wxSnow', rain: 'wxRain', wind: 'wxWind',
+  fog: 'wxFog', thunder: 'wxThunder', cold: 'wxCold', heat: 'wxHeat', uv: 'wxUv',
+};
+
+function WxLine({
+  hour,
+  verdict,
+  tempUnit,
+  prefix,
+}: {
+  hour: WxHour;
+  verdict: WxVerdict;
+  tempUnit: TempUnit;
+  prefix?: string;
+}) {
+  const kind = kindOf(hour.sym);
+  const kindKey = ('wx' + kind.charAt(0).toUpperCase() + kind.slice(1)) as TKey;
+  // The worst reason is the one worth the words; the rest are already implied.
+  const top = verdict.reasons.find((r) => r.level === verdict.level);
+  return (
+    <div className={`summary-wx wx-${verdict.level}`}>
+      {prefix ? `${prefix} · ` : ''}
+      {iconOf(hour)} {fmtTemp(hour.tempC, tempUnit)} · {t(kindKey)}
+      {top ? ` · ${t(WX_REASON_KEY[top.code])}` : ''}
+    </div>
+  );
+}
 
 const DETOUR_OPTIONS = [5, 10, 15, 25, 40, 60];
 const VISIT_OPTIONS: Array<{ key: 'visitQuick' | 'visitShort' | 'visit1h' | 'visit2h' | 'visitAny'; max: number }> = [
@@ -287,6 +333,9 @@ export default function App() {
   const [myAlongKm, setMyAlongKm] = useState<number | null>(null);
   const [themeMode, setThemeModeState] = useState<ThemeMode>(getThemeMode);
   const [units, setUnitsState] = useState<Units>(getUnits);
+  const [tempUnit, setTempUnitState] = useState<TempUnit>(getTempUnit);
+  const [wx, setWx] = useState<WxGrid>({});
+  const [wxOn, setWxOn] = useState(false);
   const [lang, setLangState] = useState<Lang>(getLang);
   // Non-car routing needs Geoapify; fall back to car in hobby mode.
   const [vehicle, setVehicleState] = useState<Vehicle>(() => (hasGeoapify() ? getVehicle() : 'car'));
@@ -1128,6 +1177,58 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [itinerary?.days.map((d) => (d.isFinal ? '' : d.stops[d.stops.length - 1]?.stop.id)).join('|')]);
 
+  // Is the weather proxy deployed and configured? Asked once; if not, every
+  // weather surface stays hidden rather than showing empty slots.
+  useEffect(() => {
+    void hasWeather().then(setWxOn);
+  }, []);
+
+  // The cells this trip needs a forecast for: the corridor the route runs
+  // through, plus whichever cells the planned stops and the destination fall
+  // in. Stops get their own cell because one can sit a long way off the road,
+  // and a motorway forecast says nothing useful about a mountain lake.
+  const wxCells = useMemo<WxCell[]>(() => {
+    const calc = routeCalcRef.current;
+    if (!route || !calc) return [];
+    const corridor = routeCells(calc.calcRoute, calc.cum);
+    const total = calc.cum[calc.cum.length - 1] || 1;
+    const extra = plan.map((st) => cellFor(st, Math.min(1, st.alongKm / total)));
+    const end = route.coords[route.coords.length - 1];
+    return mergeCells(corridor, extra, end ? [cellFor(end, 1)] : []);
+  }, [route, plan]);
+
+  // One fetch per trip serves every weather surface. Keyed on the cell keys
+  // themselves, so re-planning within the same corridor costs nothing.
+  useEffect(() => {
+    if (!wxOn || wxCells.length === 0) return;
+    let cancelled = false;
+    void fetchWeather(wxCells)
+      .then((grid) => {
+        if (!cancelled) setWx(grid);
+      })
+      .catch(() => {
+        // A missing forecast is not worth an error banner over a working trip.
+      });
+    return () => {
+      cancelled = true;
+    };
+    // The cells are the real input; the array identity changes far more often.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [wxOn, wxCells.map((c) => c.k).join('|')]);
+
+  // Forecast for the destination at the hour the traveller actually gets
+  // there — which is usually tomorrow, not now.
+  const destWx = useMemo(() => {
+    if (!itinerary || wxCells.length === 0) return null;
+    const cell = wxCells[wxCells.length - 1];
+    const hours = wx[cell.k];
+    if (!hours) return null;
+    const hour = hourAt(hours, itinerary.arriveAt);
+    if (!hour) return null;
+    const avgKmh = route && route.durationMin > 0 ? route.distanceKm / (route.durationMin / 60) : 70;
+    return { hour, verdict: severity(hour, vehicle, avgKmh) };
+  }, [itinerary, wx, wxCells, vehicle, route]);
+
   function toggleDayBreak(id: string) {
     setDayBreaks((prev) => {
       const next = new Set(prev);
@@ -1373,7 +1474,7 @@ export default function App() {
       const meal =
         mins >= 680 && mins <= 830 ? 'mealLunch' : mins >= 1040 && mins <= 1180 ? 'mealDinner' : null;
       if (meal) {
-        out.set(s.id, { clock: eta.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }), meal });
+        out.set(s.id, { clock: clockTime(eta), meal });
       }
     }
     return out;
@@ -1771,6 +1872,24 @@ export default function App() {
                   </button>
                 ))}
               </div>
+              {/* Temperature is its own control, not derived from km/mi: that
+                  preference maps the UK to miles and the UK reads Celsius. */}
+              <div className="units-toggle temp-toggle" role="group" aria-label="Temperature units">
+                {(['c', 'f'] as TempUnit[]).map((u) => (
+                  <button
+                    key={u}
+                    type="button"
+                    className={tempUnit === u ? 'active' : ''}
+                    aria-pressed={tempUnit === u}
+                    onClick={() => {
+                      setTempUnitState(u);
+                      setTempUnit(u);
+                    }}
+                  >
+                    °{u.toUpperCase()}
+                  </button>
+                ))}
+              </div>
               <button
                 type="button"
                 className="theme-btn"
@@ -2080,6 +2199,14 @@ export default function App() {
               {t('stopsFound', { n: stops.length })}
             </div>
             {route.tolls && <div className="summary-tolls">🚧 {t('tollsMaybe')}</div>}
+            {destWx && itinerary && (
+              <WxLine
+                hour={destWx.hour}
+                verdict={destWx.verdict}
+                tempUnit={tempUnit}
+                prefix={`🏁 ${clockTime(itinerary.arriveAt)}`}
+              />
+            )}
             {(() => {
               const dest = routeLabel.split('→')[1]?.trim();
               const hotels = dest ? hotelsLink(dest) : null;
@@ -2399,7 +2526,7 @@ export default function App() {
                 const avgKmh =
                   route && route.durationMin > 0 ? route.distanceKm / (route.durationMin / 60) : 70;
                 const eta = new Date(Date.now() + (s.alongKm / avgKmh) * 3600_000);
-                const etaClock = eta.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+                const etaClock = clockTime(eta);
                 const hs = hoursStatus(s.hours, eta);
                 return (
                   <div
@@ -2598,6 +2725,15 @@ export default function App() {
           {anyAffiliate() && (
             <p className="foot-disclosure">
               Links marked 🎟️/🏨/⛽ are affiliate links — they support the app at no extra cost to you.
+            </p>
+          )}
+          {/* MET Norway's licence requires visible credit wherever their data
+              is shown. Only rendered when weather is actually available. */}
+          {wxOn && Object.keys(wx).length > 0 && (
+            <p className="foot-wx">
+              <a href="https://api.met.no/" target="_blank" rel="noreferrer">
+                {t('wxCredit')}
+              </a>
             </p>
           )}
           <a href="/privacy.html" target="_blank" rel="noreferrer">

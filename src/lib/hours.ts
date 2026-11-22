@@ -4,6 +4,8 @@
 // "20:00-02:00") and is deliberately conservative: anything it doesn't fully
 // understand yields no status, and the UI falls back to showing the raw text.
 
+import { clockTime } from './format';
+
 const DAYS = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa']; // index = JS getDay()
 
 interface Rule {
@@ -62,7 +64,7 @@ function parseRules(spec: string): Rule[] | null {
 const fmtMin = (min: number) => {
   const d = new Date();
   d.setHours(Math.floor((min % 1440) / 60), min % 60, 0, 0);
-  return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  return clockTime(d);
 };
 
 export interface HoursStatus {
