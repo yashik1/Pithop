@@ -68,3 +68,22 @@ describe('the policy keeps its teeth', () => {
     expect(sources('object-src')).toEqual(["'none'"]);
   });
 });
+
+describe('weather goes through our own server', () => {
+  // The browser must never call the forecast provider directly. It cannot set
+  // the User-Agent they require, their CORS terms are unsettled, and a direct
+  // call would hand every traveller's IP and coordinates to a third party —
+  // which the privacy page explicitly promises does not happen.
+  //
+  // The tempting "fix" when the proxy misbehaves is to allowlist the host and
+  // call it from the client. This is here to make that fail loudly.
+  it('does not let the page reach the forecast provider itself', () => {
+    expect(allows('connect-src', 'https://api.met.no/weatherapi/locationforecast/2.0/complete')).toBe(
+      false,
+    );
+  });
+
+  it('still allows same-origin requests, which is how /api/weather is reached', () => {
+    expect(sources('connect-src')).toContain("'self'");
+  });
+});

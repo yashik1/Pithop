@@ -2588,6 +2588,45 @@ body {
   color: #fff;
 }
 
+/* Weather, tinted by how much it matters to this traveller. 'none' is the
+   common case and stays quiet — a forecast is information, not an alarm. */
+.summary-wx {
+  margin-top: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink-2);
+}
+
+.summary-wx.wx-note {
+  color: var(--ink-2);
+}
+
+.summary-wx.wx-caution {
+  color: #a66a00;
+}
+
+.summary-wx.wx-warn {
+  color: #c02626;
+}
+
+:root[data-theme='dark'] .summary-wx.wx-caution {
+  color: #e2a93c;
+}
+
+:root[data-theme='dark'] .summary-wx.wx-warn {
+  color: #ff8080;
+}
+
+/* The temperature control sits beside km/mi but reads as its own choice. */
+.foot-wx {
+  margin: 0 0 4px;
+  font-size: 11.5px;
+}
+
+.temp-toggle {
+  margin-left: 4px;
+}
+
 .summary-tolls {
   margin-top: 4px;
   font-size: 12.5px;
